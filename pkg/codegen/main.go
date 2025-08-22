@@ -15,7 +15,10 @@ import (
 )
 
 func main() {
-	os.Unsetenv("GOPATH")
+	err := os.Unsetenv("GOPATH")
+	if err != nil {
+		panic(err)
+	}
 
 	controllergen.Run(args.Options{
 		OutputPackage: "github.com/rancher/ali-operator/pkg/generated",
@@ -78,7 +81,12 @@ func saveCRDYaml(name, yaml string) error {
 		return err
 	}
 
-	defer save.Close()
+	defer func() {
+		if err := save.Close(); err != nil {
+			fmt.Printf("failed to close: %v\n", err)
+		}
+	}()
+
 	if err := save.Chmod(0755); err != nil {
 		return err
 	}
