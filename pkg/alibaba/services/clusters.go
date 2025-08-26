@@ -11,6 +11,8 @@ import (
 	credential "github.com/aliyun/credentials-go/credentials"
 )
 
+var errEmptyRegion = errors.New("regionId can not be empty")
+
 type ClustersClientInterface interface {
 	DescribeClusterUserKubeconfig(ctx context.Context, clusterId *string, request *cs.DescribeClusterUserKubeconfigRequest) (result *cs.DescribeClusterUserKubeconfigResponse, err error)
 	DescribeClusterDetail(ctx context.Context, clusterId *string) (result *cs.DescribeClusterDetailResponse, err error)
@@ -24,7 +26,7 @@ type clustersClient struct {
 
 func NewClustersClient(creds *Credentials, regionId string) (*clustersClient, error) {
 	if regionId == "" {
-		return nil, errors.New("regionId can not be empty")
+		return nil, errEmptyRegion
 	}
 
 	credentials, err := getCredentials(creds.AccessKeyID, creds.AccessKeySecret)
@@ -35,9 +37,9 @@ func NewClustersClient(creds *Credentials, regionId string) (*clustersClient, er
 	openAPICfg := &openapi.Config{
 		Credential: credentials,
 		Protocol:   tea.String("https"),
+		Endpoint:   tea.String("cs." + regionId + ".aliyuncs.com"),
 	}
 
-	openAPICfg.Endpoint = tea.String("cs." + regionId + ".aliyuncs.com")
 	client, err := cs.NewClient(openAPICfg)
 	if err != nil {
 		return nil, err
@@ -46,25 +48,6 @@ func NewClustersClient(creds *Credentials, regionId string) (*clustersClient, er
 	return &clustersClient{
 		client: client,
 	}, nil
-}
-
-func CreateCSClient(ak, sk, regionId string) (*cs.Client, error) {
-	if regionId == "" {
-		return nil, errors.New("regionId can not be empty")
-	}
-
-	credentials, err := getCredentials(ak, sk)
-	if err != nil {
-		return nil, err
-	}
-
-	openAPICfg := &openapi.Config{
-		Credential: credentials,
-		Protocol:   tea.String("https"),
-	}
-
-	openAPICfg.Endpoint = tea.String("cs." + regionId + ".aliyuncs.com")
-	return cs.NewClient(openAPICfg)
 }
 
 func getCredentials(ak, sk string) (credential.Credential, error) {

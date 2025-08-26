@@ -2,7 +2,6 @@ package alibaba
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
@@ -29,9 +28,9 @@ func Create(ctx context.Context, client services.ClustersClientInterface, config
 
 func validateCreateRequest(configSpec *aliv1.AliClusterConfigSpec) error {
 	if configSpec.ClusterName == "" {
-		return fmt.Errorf("cluster display name is required")
+		return ErrRequiredClusterName
 	} else if configSpec.RegionID == "" {
-		return fmt.Errorf("region id is required")
+		return ErrRequiredRegionID
 	}
 
 	return nil

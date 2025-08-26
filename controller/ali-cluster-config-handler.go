@@ -29,7 +29,7 @@ const (
 	aliConfigImportingPhase  = "importing"
 	controllerName           = "ali-controller"
 	controllerRemoveName     = "ali-controller-remove"
-	wait                     = 30
+	enqueuePeriod            = 30
 )
 
 type alibabaClients struct {
@@ -147,12 +147,11 @@ func (h *Handler) OnAliConfigRemoved(_ string, config *aliv1.AliClusterConfig) (
 	}
 
 	_, err := h.alibabaClients.clustersClient.DescribeClusterDetail(ctx, &config.Spec.ClusterID)
-	if err != nil {
-		logrus.Infof("Get Cluster %v error: %+v", config.Spec.ClusterName, err)
-		if alibaba.IsNotFound(err) {
-			logrus.Infof("Cluster %v , region %v already removed", config.Spec.ClusterName, config.Spec.RegionID)
-			return config, nil
-		}
+	if alibaba.IsNotFound(err) {
+		logrus.Infof("Cluster %v , region %v already removed", config.Spec.ClusterName, config.Spec.RegionID)
+		return config, nil
+	} else if err != nil {
+		logrus.Errorf("Get Cluster %v error: %+v", config.Spec.ClusterName, err)
 		return config, err
 	}
 
@@ -222,7 +221,7 @@ func (h *Handler) waitForCreationComplete(config *aliv1.AliClusterConfig) (*aliv
 	}
 
 	logrus.Infof("Waiting for cluster [%s] to finish creating", config.Name)
-	h.aliEnqueueAfter(config.Namespace, config.Name, wait*time.Second)
+	h.aliEnqueueAfter(config.Namespace, config.Name, enqueuePeriod*time.Second)
 	return config, nil
 }
 

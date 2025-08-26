@@ -10,6 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const defaultNamespace = "default"
+
 func GetSecrets(secretClient wranglerv1.SecretClient, spec *aliv1.AliClusterConfigSpec) (*services.Credentials, error) {
 	var cred services.Credentials
 
@@ -20,7 +22,7 @@ func GetSecrets(secretClient wranglerv1.SecretClient, spec *aliv1.AliClusterConf
 	ns, id := ParseSecretName(spec.AlibabaCredentialSecret)
 	secret, err := secretClient.Get(ns, id, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find secret [%s] in namespace [%s]", id, ns)
+		return nil, fmt.Errorf("error getting credential secret [%s] in namespace [%s]: %w", id, ns, err)
 	}
 
 	accessKeyID := secret.Data["alibabacredentialConfig-accessKeyId"]
@@ -42,7 +44,7 @@ func GetSecrets(secretClient wranglerv1.SecretClient, spec *aliv1.AliClusterConf
 func ParseSecretName(ref string) (namespace string, name string) {
 	parts := strings.SplitN(ref, ":", 2)
 	if len(parts) == 1 {
-		return "", parts[0]
+		return defaultNamespace, parts[0]
 	}
 	return parts[0], parts[1]
 }
