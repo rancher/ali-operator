@@ -9,6 +9,7 @@ import (
 var (
 	ErrRequiredRegionID    error = errors.New("region id is required")
 	ErrRequiredClusterName error = errors.New("cluster name is required")
+	ErrInvalidClusterType        = "cluster type %s is not supported"
 )
 
 func IsNotFound(err error) bool {

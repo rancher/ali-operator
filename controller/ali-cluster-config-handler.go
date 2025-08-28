@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"time"
 
 	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
+	"github.com/alibabacloud-go/tea/tea"
 
 	"github.com/rancher/ali-operator/pkg/alibaba"
 	"github.com/rancher/ali-operator/pkg/alibaba/services"
@@ -18,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -29,7 +32,7 @@ const (
 	aliConfigImportingPhase  = "importing"
 	controllerName           = "ali-controller"
 	controllerRemoveName     = "ali-controller-remove"
-	enqueuePeriod            = 30
+	enqueuePeriod            = 30 * time.Second
 )
 
 type alibabaClients struct {
@@ -101,7 +104,7 @@ func (h *Handler) recordError(onChange func(key string, config *aliv1.AliCluster
 				// conflict error means the config is updated by rancher controller
 				// the changes which needs to be done by the operator controller will be handled in next
 				// reconcile call
-				logrus.Debugf("Error updating aksclusterconfig: %s", err.Error())
+				logrus.Debugf("Error updating aliclusterconfig: %s", err.Error())
 				return config, err
 			}
 
@@ -160,12 +163,37 @@ func (h *Handler) OnAliConfigRemoved(_ string, config *aliv1.AliClusterConfig) (
 		logrus.Debugf("Error deleting cluster %s: %v", config.Spec.ClusterName, err)
 		return config, err
 	}
+	logrus.Infof("Successfully sent request to delete cluster %v , region %v", config.Spec.ClusterName, config.Spec.RegionID)
 
 	return config, nil
 }
 
-func (h *Handler) importCluster(_ *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
-	return &aliv1.AliClusterConfig{}, nil
+func (h *Handler) importCluster(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logrus.Infof("Importing config for cluster [%s (id: %s)]", config.Spec.ClusterName, config.Name)
+
+	clusterResp, err := h.alibabaClients.clustersClient.DescribeClusterDetail(ctx, &config.Spec.ClusterID)
+	if err != nil {
+		return config, err
+	}
+	if clusterResp == nil || clusterResp.Body == nil || clusterResp.Body.State == nil || *clusterResp.Body.State != alibaba.ClusterStatusRunning {
+		state := "unknown"
+		if clusterResp != nil && clusterResp.Body != nil && clusterResp.Body.State != nil {
+			state = *clusterResp.Body.State
+		}
+		return config, fmt.Errorf("the current cluster status is %s. Please wait for the cluster to become %s", state, alibaba.ClusterStatusRunning)
+	}
+
+	if err := h.createCASecret(ctx, config); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return config, err
+		}
+	}
+
+	config.Status.Phase = aliConfigActivePhase
+	return h.aliCC.UpdateStatus(config)
 }
 
 func (h *Handler) create(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
@@ -179,20 +207,21 @@ func (h *Handler) create(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfi
 	}
 
 	if config.Spec.ClusterID == "" {
-		if err := alibaba.Create(ctx, h.alibabaClients.clustersClient, &config.Spec); err != nil {
+		clusterID, err := alibaba.Create(ctx, h.alibabaClients.clustersClient, &config.Spec)
+		if err != nil {
 			return config, err
 		}
+		config.Spec.ClusterID = clusterID
 	}
-
 	configUpdate := config.DeepCopy()
 	configUpdate, err := h.aliCC.Update(configUpdate)
 	if err != nil {
 		return config, err
 	}
-
 	config = configUpdate.DeepCopy()
 	config.Status.Phase = aliConfigCreatingPhase
 	config, err = h.aliCC.UpdateStatus(config)
+	logrus.Infof("Cluster id:%s for cluster:%s", config.Spec.ClusterID, config.Spec.ClusterName)
 	return config, err
 }
 
@@ -221,16 +250,105 @@ func (h *Handler) waitForCreationComplete(config *aliv1.AliClusterConfig) (*aliv
 	}
 
 	logrus.Infof("Waiting for cluster [%s] to finish creating", config.Name)
-	h.aliEnqueueAfter(config.Namespace, config.Name, enqueuePeriod*time.Second)
+	h.aliEnqueueAfter(config.Namespace, config.Name, enqueuePeriod)
 	return config, nil
 }
 
-func (h *Handler) checkAndUpdate(_ *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
-	return &aliv1.AliClusterConfig{}, nil
+func (h *Handler) checkAndUpdate(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cluster, err := alibaba.GetCluster(ctx, h.alibabaClients.clustersClient, config.Spec.ClusterID)
+	if err != nil {
+		logrus.Errorf("update cluster error: %v", err)
+		return config, err
+	}
+
+	alibaba.SyncConfigSpecClusterFieldsWithUpstream(&config.Spec, cluster)
+
+	if config.Status.UpgradeTaskID != "" {
+		taskInfoResp, err := h.alibabaClients.clustersClient.DescribeTaskInfo(ctx, &config.Status.UpgradeTaskID)
+		if err != nil {
+			return config, fmt.Errorf("failed to describe task info for cluster %s: %w", config.Spec.ClusterID, err)
+		}
+		if taskInfoResp == nil || taskInfoResp.Body == nil {
+			logrus.Debugf("Received empty task info for cluster %s, err: received empty task info", config.Spec.ClusterID)
+		} else {
+			taskInfo := taskInfoResp.Body
+			if taskInfo.State != nil {
+				switch *taskInfo.State {
+				case alibaba.UpdateK8sRunningStatus:
+					logrus.Infof("Cluster %s in region %s is being upgraded", config.Spec.ClusterName, config.Spec.RegionID)
+					return h.enqueueUpdate(config, enqueuePeriod)
+				case alibaba.UpdateK8sFailStatus:
+					if taskInfo.Error == nil || taskInfo.Error.Message == nil {
+						return config, fmt.Errorf("update cluster %s failed: error message is missing", config.Spec.ClusterID)
+					}
+					errMsg := fmt.Sprintf(`{"%s":"%s"}`, alibaba.UpdateK8SError, *taskInfo.Error.Message)
+					return config, fmt.Errorf("update cluster %s failed: %s", config.Spec.ClusterID, errMsg)
+				case alibaba.UpdateK8sSuccessStatus:
+					config = config.DeepCopy()
+					config.Status.UpgradeTaskID = ""
+					return h.aliCC.UpdateStatus(config)
+				default:
+					logrus.Warnf("Received unknown task[%s] status %s for cluster %s", tea.StringValue(taskInfo.TaskId), tea.StringValue(taskInfo.State), config.Spec.ClusterName)
+				}
+			}
+		}
+	}
+
+	// waiting for cluster to come in running state
+	clusterState := tea.StringValue(cluster.State)
+	if clusterState == "" {
+		config = config.DeepCopy()
+		config.Status.FailureMessage = fmt.Sprintf("Upstream cluster %s in region %s is in unknown state", config.Spec.ClusterName, config.Spec.RegionID)
+		config.Status.Phase = aliConfigUpdatingPhase
+		return h.aliCC.UpdateStatus(config)
+	}
+
+	if clusterState != alibaba.ClusterStatusRunning {
+		logrus.Infof("Cluster is in %s state, waiting for the cluster to come in %s state", clusterState, alibaba.ClusterStatusRunning)
+		return h.enqueueUpdate(config, enqueuePeriod)
+	}
+
+	nodePools, err := alibaba.GetNodePools(ctx, h.alibabaClients.clustersClient, &config.Spec)
+	if err != nil {
+		return config, err
+	}
+	for _, np := range nodePools {
+		if np == nil || np.NodepoolInfo == nil || np.NodepoolInfo.Name == nil {
+			logrus.Warn("Update cluster: no nodepool information is available")
+			continue
+		}
+		if np.Status == nil || np.Status.State == nil {
+			logrus.Warnf("Update cluster: nodepool %s is in unknown state", *np.NodepoolInfo.Name)
+			continue
+		}
+		if alibaba.WaitForNodePool(np.Status.State) {
+			logrus.Infof("Waiting for cluster [%s] to sync nodepool [%s] state [%s]", config.Spec.ClusterName, *np.NodepoolInfo.Name, *np.Status.State)
+			return h.enqueueUpdate(config, enqueuePeriod)
+		}
+	}
+
+	if config.Spec.KubernetesVersion != tea.StringValue(cluster.CurrentVersion) {
+		if config.Status.Phase != aliConfigUpdatingPhase {
+			return h.enqueueUpdate(config, enqueuePeriod)
+		}
+		taskID, err := alibaba.UpgradeCluster(ctx, h.alibabaClients.clustersClient, &config.Spec)
+		if err != nil {
+			updateErr := fmt.Errorf(`{"%s":"%s"}`, alibaba.UpdateK8SVersionApiError, err.Error())
+			return config, updateErr
+		}
+		config = config.DeepCopy()
+		config.Status.UpgradeTaskID = taskID
+		return h.updateStatus(config)
+	}
+
+	return h.updateUpstreamClusterState(config)
 }
 
 func (h *Handler) getAlibabaClients(config *aliv1.AliClusterConfig) error {
-	credentials, err := alibaba.GetSecrets(h.secrets, &config.Spec)
+	credentials, err := alibaba.GetSecrets(h.secretsCache, &config.Spec)
 	if err != nil {
 		return fmt.Errorf("error getting credentials: %w", err)
 	}
@@ -285,4 +403,288 @@ func (h *Handler) createCASecret(ctx context.Context, config *aliv1.AliClusterCo
 		return nil
 	}
 	return err
+}
+
+// enqueueUpdate enqueues the config if it is already in the updating phase. Otherwise, the
+// phase is updated to "updating".
+func (h *Handler) enqueueUpdate(config *aliv1.AliClusterConfig, period time.Duration) (*aliv1.AliClusterConfig, error) {
+	if config.Status.Phase == aliConfigUpdatingPhase {
+		h.aliEnqueueAfter(config.Namespace, config.Name, period)
+		return config, nil
+	}
+
+	config = config.DeepCopy()
+	config.Status.Phase = aliConfigUpdatingPhase
+	return h.aliCC.UpdateStatus(config)
+}
+
+// updateStatus updates the status of config with retry
+func (h *Handler) updateStatus(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
+	if config == nil {
+		return config, nil
+	}
+	configStatus := config.Status.DeepCopy()
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		config, err = h.aliCC.Get(config.Namespace, config.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		config = config.DeepCopy()
+		config.Status = *configStatus
+		config, err = h.aliCC.UpdateStatus(config)
+		return err
+	})
+	return config, err
+}
+
+// updateUpstreamClusterState sync config to upstream cluster
+func (h *Handler) updateUpstreamClusterState(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	changed, err := h.updateNodePools(ctx, config)
+	if err != nil {
+		return config, err
+	}
+	if changed {
+		return h.enqueueUpdate(config, 0)
+	}
+
+	// no new updates, set to active
+	if config.Status.Phase != aliConfigActivePhase {
+		logrus.Infof("cluster [%s] finished updating", config.Name)
+		config = config.DeepCopy()
+		config.Status.Phase = aliConfigActivePhase
+		return h.aliCC.UpdateStatus(config)
+	}
+
+	return config, nil
+}
+
+func (h *Handler) updateNodePools(
+	ctx context.Context,
+	config *aliv1.AliClusterConfig,
+) (bool, error) {
+	client := h.alibabaClients.clustersClient
+
+	upstreamNodePools, err := alibaba.GetNodePools(ctx, client, &config.Spec)
+	if err != nil {
+		return false, err
+	}
+	upstreamNodePoolsConfig := alibaba.ToNodePoolConfig(upstreamNodePools)
+
+	// lookup maps
+	nodePoolNameKeyMap := make(map[string]aliv1.NodePool)
+	upstreamNodePoolConfigMap := make(map[string]aliv1.NodePool)
+	for _, np := range upstreamNodePoolsConfig {
+		upstreamNodePoolConfigMap[np.NodePoolID] = np
+		nodePoolNameKeyMap[np.Name] = np
+	}
+
+	// fix NodePoolIDs
+	for i, npConfig := range config.Spec.NodePools {
+		if nodePool, ok := nodePoolNameKeyMap[npConfig.Name]; ok {
+			config.Spec.NodePools[i].NodePoolID = nodePool.NodePoolID
+		}
+	}
+
+	// classify desired pools
+	var (
+		updateQueue []aliv1.NodePool
+		createQueue []aliv1.NodePool
+	)
+	for _, npConfig := range config.Spec.NodePools {
+		if npConfig.NodePoolID != "" {
+			updateQueue = append(updateQueue, *npConfig.DeepCopy())
+		} else {
+			createQueue = append(createQueue, *npConfig.DeepCopy())
+		}
+	}
+
+	createNeeded := len(createQueue) > 0
+	updateNeeded := needsUpdate(updateQueue, upstreamNodePoolConfigMap)
+	deleteNeeded := needsDelete(updateQueue, upstreamNodePoolsConfig)
+
+	if !createNeeded && !updateNeeded && !deleteNeeded {
+		return false, nil
+	}
+	if config.Status.Phase != aliConfigUpdatingPhase {
+		return true, err
+	}
+
+	changed := false
+
+	if createNeeded {
+		changed, err := h.handleCreateNodePools(ctx, client, &config.Spec, createQueue)
+		if err != nil {
+			return changed, err
+		}
+		if changed {
+			return changed, nil
+		}
+	}
+
+	if updateNeeded {
+		changed, err := h.handleUpdateNodePools(ctx, &config.Spec, updateQueue, upstreamNodePoolConfigMap)
+		if err != nil {
+			return changed, err
+		}
+		if changed {
+			return changed, nil
+		}
+	}
+
+	if deleteNeeded {
+		changed, err := h.handleDeleteNodePools(ctx, client, &config.Spec, updateQueue, upstreamNodePoolsConfig)
+		if err != nil {
+			return changed, err
+		}
+		if changed {
+			return changed, nil
+		}
+	}
+
+	return changed, nil
+}
+
+// handleCreateNodePools creates nodepools and updates IDs in configSpec.
+func (h *Handler) handleCreateNodePools(
+	ctx context.Context,
+	client services.ClustersClientInterface,
+	configSpec *aliv1.AliClusterConfigSpec,
+	nodePools []aliv1.NodePool,
+) (bool, error) {
+	var failed []string
+	changed := false
+	for _, np := range nodePools {
+		logrus.Infof("Creating nodepool [%s] for cluster [%s]", np.Name, configSpec.ClusterName)
+		c, err := alibaba.CreateNodePool(ctx, client, configSpec, &np)
+		if err != nil {
+			failed = append(failed, fmt.Sprintf("nodepool %s create error: %s", np.Name, err.Error()))
+			continue
+		}
+		changed = true
+		logrus.Infof("Nodepool [%s] created with id [%s] in cluster [%s]",
+			np.Name, tea.StringValue(c.NodepoolId), configSpec.ClusterName)
+	}
+	if len(failed) > 0 {
+		return changed, fmt.Errorf("%s", strings.Join(failed, ";"))
+	}
+	return changed, nil
+}
+
+// handleUpdateNodePools scales nodepools up/down if needed.
+func (h *Handler) handleUpdateNodePools(
+	ctx context.Context,
+	configSpec *aliv1.AliClusterConfigSpec,
+	updateQueue []aliv1.NodePool,
+	upstream map[string]aliv1.NodePool,
+) (bool, error) {
+	var failed []string
+	changed := false
+	for _, np := range updateQueue {
+		unp, ok := upstream[np.NodePoolID]
+		if !ok {
+			continue
+		}
+		if tea.BoolValue(unp.EnableAutoScaling) != tea.BoolValue(np.EnableAutoScaling) {
+			logrus.Warnf("Skipping update for nodepool [%s], scaling configuration mismatch in cluster [%s]", unp.Name, configSpec.ClusterName)
+			continue
+		}
+		if np.EnableAutoScaling != nil && np.MinInstances != nil && np.MaxInstances != nil &&
+			unp.EnableAutoScaling != nil && tea.BoolValue(unp.EnableAutoScaling) && tea.BoolValue(np.EnableAutoScaling) &&
+			(tea.Int64Value(np.MaxInstances) != tea.Int64Value(unp.MaxInstances) ||
+				tea.Int64Value(np.MinInstances) != tea.Int64Value(unp.MinInstances)) {
+
+			logrus.Infof("Updating nodepool [%s] in cluster [%s] from maxInstances:[%d] minInstance: [%d] to maxInstances:[%d] minInstance: [%d]",
+				np.Name, configSpec.ClusterName, tea.Int64Value(unp.MaxInstances), tea.Int64Value(unp.MinInstances), tea.Int64Value(np.MaxInstances), tea.Int64Value(np.MinInstances))
+			err := alibaba.UpdateNodePoolAutoScalingConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, np.MaxInstances, np.MinInstances)
+			if err != nil {
+				failed = append(failed, fmt.Sprintf("nodepool %s autoscaling update error: %s", np.Name, err.Error()))
+				continue
+			}
+			changed = true
+		} else if np.DesiredSize != nil && unp.DesiredSize != nil && tea.Int64Value(np.DesiredSize) != tea.Int64Value(unp.DesiredSize) {
+			logrus.Infof("Updating desired size for nodepool [%s] in cluster [%s] from %d to %d",
+				np.Name, configSpec.ClusterName, tea.Int64Value(unp.DesiredSize), tea.Int64Value(np.DesiredSize))
+			err := alibaba.UpdateNodePoolDesiredSize(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, np.DesiredSize)
+			if err != nil {
+				failed = append(failed, fmt.Sprintf("nodepool %s desired size update error: %s", np.Name, err.Error()))
+				continue
+			}
+			changed = true
+		}
+	}
+	if len(failed) > 0 {
+		return changed, fmt.Errorf("%s", strings.Join(failed, ";"))
+	}
+	return changed, nil
+}
+
+// handleDeleteNodePools deletes upstream pools not present in desired config.
+func (h *Handler) handleDeleteNodePools(
+	ctx context.Context,
+	client services.ClustersClientInterface,
+	configSpec *aliv1.AliClusterConfigSpec,
+	existingNodePools []aliv1.NodePool,
+	upstreamPools []aliv1.NodePool,
+) (bool, error) {
+	updatedIDMap := make(map[string]struct{})
+	for _, pool := range existingNodePools {
+		updatedIDMap[pool.NodePoolID] = struct{}{}
+	}
+	for _, np := range upstreamPools {
+		if _, ok := updatedIDMap[np.NodePoolID]; ok {
+			continue
+		}
+		logrus.Infof("Deleting node pool [%s] (id %s) for from cluster [%s]", np.Name, np.NodePoolID, configSpec.ClusterName)
+		err := alibaba.DeleteNodePool(ctx, client, configSpec.ClusterID, &np)
+		if err != nil {
+			return true, fmt.Errorf("nodepool %s delete error: %s", np.NodePoolID, err.Error())
+		}
+		// deletion needs to be done one by one
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func needsUpdate(desired []aliv1.NodePool, upstream map[string]aliv1.NodePool) bool {
+	for _, np := range desired {
+		unp, ok := upstream[np.NodePoolID]
+		if !ok {
+			continue
+		}
+		// AutoScaling mismatch
+		if np.EnableAutoScaling != nil && unp.EnableAutoScaling != nil {
+			if tea.BoolValue(np.EnableAutoScaling) && tea.BoolValue(unp.EnableAutoScaling) {
+				if tea.Int64Value(np.MaxInstances) != tea.Int64Value(unp.MaxInstances) ||
+					tea.Int64Value(np.MinInstances) != tea.Int64Value(unp.MinInstances) {
+					return true
+				}
+			}
+		}
+		// DesiredSize mismatch
+		if np.DesiredSize != nil && unp.DesiredSize != nil &&
+			tea.Int64Value(np.DesiredSize) != tea.Int64Value(unp.DesiredSize) {
+			return true
+		}
+	}
+	return false
+}
+
+// needsDelete checks if upstream has pools that aren’t in desired
+func needsDelete(desired []aliv1.NodePool, upstream []aliv1.NodePool) bool {
+	desiredMap := make(map[string]struct{})
+	for _, d := range desired {
+		desiredMap[d.NodePoolID] = struct{}{}
+	}
+	for _, np := range upstream {
+		if _, ok := desiredMap[np.NodePoolID]; !ok {
+			return true
+		}
+	}
+	return false
 }

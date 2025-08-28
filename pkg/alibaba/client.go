@@ -7,12 +7,11 @@ import (
 	"github.com/rancher/ali-operator/pkg/alibaba/services"
 	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const defaultNamespace = "default"
 
-func GetSecrets(secretClient wranglerv1.SecretClient, spec *aliv1.AliClusterConfigSpec) (*services.Credentials, error) {
+func GetSecrets(secretsCache wranglerv1.SecretCache, spec *aliv1.AliClusterConfigSpec) (*services.Credentials, error) {
 	var cred services.Credentials
 
 	if spec.AlibabaCredentialSecret == "" {
@@ -20,7 +19,7 @@ func GetSecrets(secretClient wranglerv1.SecretClient, spec *aliv1.AliClusterConf
 	}
 
 	ns, id := ParseSecretName(spec.AlibabaCredentialSecret)
-	secret, err := secretClient.Get(ns, id, metav1.GetOptions{})
+	secret, err := secretsCache.Get(ns, id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting credential secret [%s] in namespace [%s]: %w", id, ns, err)
 	}
