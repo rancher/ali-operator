@@ -65,7 +65,7 @@ func SyncConfigSpecClusterFieldsWithUpstream(configSpec *aliv1.AliClusterConfigS
 		if err != nil {
 			logrus.Warnf("get node-cidr-mask failed:%s", nodeCidrMask)
 		} else {
-			configSpec.NodeCIDRMask = int64(maskNum)
+			configSpec.NodeCIDRMask = maskNum
 		}
 	}
 }

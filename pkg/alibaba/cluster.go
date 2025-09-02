@@ -67,7 +67,7 @@ func newClusterCreateRequest(configSpec *aliv1.AliClusterConfigSpec) *cs.CreateC
 	req.Vpcid = tea.String(configSpec.VpcID)
 	req.ContainerCidr = tea.String(configSpec.ContainerCIDR)
 	req.ServiceCidr = tea.String(configSpec.ServiceCIDR)
-	req.NodeCidrMask = tea.String(strconv.Itoa(int(configSpec.NodeCIDRMask)))
+	req.NodeCidrMask = tea.String(strconv.Itoa(configSpec.NodeCIDRMask))
 	req.SnatEntry = tea.Bool(configSpec.SNATEntry)
 	req.ProxyMode = tea.String(configSpec.ProxyMode)
 	req.EndpointPublicAccess = tea.Bool(configSpec.EndpointPublicAccess)

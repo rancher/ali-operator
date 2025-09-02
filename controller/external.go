@@ -20,6 +20,10 @@ func BuildUpstreamClusterState(secretsCache wranglerv1.SecretCache, configSpec *
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	if configSpec == nil {
+		logrus.Warn("Warning BuildUpstreamClusterState: The 'configSpec' data is nil, the cluster's configSpec is not available")
+		return configSpec, nil
+	}
 	credentials, err := alibaba.GetSecrets(secretsCache, configSpec)
 	if err != nil {
 		return nil, fmt.Errorf("error getting credentials: %w", err)
@@ -27,11 +31,6 @@ func BuildUpstreamClusterState(secretsCache wranglerv1.SecretCache, configSpec *
 	clustersClient, err := services.NewClustersClient(credentials, configSpec.RegionID)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client secret credential: %w", err)
-	}
-
-	if configSpec == nil {
-		logrus.Warn("Warning BuildUpstreamClusterState: The 'configSpec' data is nil, the cluster's configSpec is not available")
-		return configSpec, nil
 	}
 
 	clusterResp, err := clustersClient.DescribeClusterDetail(ctx, &configSpec.ClusterID)
@@ -80,7 +79,7 @@ func BuildUpstreamClusterState(secretsCache wranglerv1.SecretCache, configSpec *
 	}
 
 	nodeCIDRMask := tea.StringValue(cluster.NodeCidrMask)
-	nodeCIDRMaskVal, err := strconv.ParseInt(nodeCIDRMask, 10, 64)
+	nodeCIDRMaskVal, err := strconv.Atoi(nodeCIDRMask)
 	if err != nil {
 		logrus.Warnf("error parsing nodeCIDRMask value:%v", err)
 	} else {
@@ -89,10 +88,14 @@ func BuildUpstreamClusterState(secretsCache wranglerv1.SecretCache, configSpec *
 
 	nodePools, err := alibaba.GetNodePools(ctx, clustersClient, configSpec)
 	if err != nil {
+		if errors.Is(err, alibaba.ErrEmptyClusterNodePools) {
+			return configSpec, nil
+		}
 		return configSpec, err
 	}
-
-	newSpec.NodePools = alibaba.ToNodePoolConfig(nodePools)
+	if len(nodePools) > 0 {
+		newSpec.NodePools = alibaba.ToNodePoolConfig(nodePools)
+	}
 	return newSpec, nil
 }
 

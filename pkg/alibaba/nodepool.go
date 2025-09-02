@@ -19,7 +19,7 @@ func GetNodePools(ctx context.Context, client services.ClustersClientInterface, 
 		return nil, err
 	}
 	if nodePoolsResp == nil || nodePoolsResp.Body == nil {
-		return nil, errors.New("received empty response for cluster nodepools")
+		return nil, ErrEmptyClusterNodePools
 	}
 
 	return nodePoolsResp.Body.Nodepools, nil

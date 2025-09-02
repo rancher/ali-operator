@@ -59,7 +59,7 @@ type AliClusterConfigSpec struct {
 	// NodeCIDRMask is the maximum number of IP addresses that can be assigned to each node.
 	// This number is determined by the subnet mask of the specified CIDR block
 	// only applicable for flannel network plugin
-	NodeCIDRMask int64 `json:"nodeCidrMask,omitempty" norman:"noupdate"`
+	NodeCIDRMask int `json:"nodeCidrMask,omitempty" norman:"noupdate"`
 	// VSwitchIDs is the vSwitches for nodes in the cluster.
 	VSwitchIDs []string `json:"vswitchIds,omitempty" norman:"noupdate"`
 	// PodVswitchIDs is the vSwitches for pods.
