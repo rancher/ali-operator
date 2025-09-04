@@ -15,4 +15,4 @@ jobs:
         with:
           go-version: 1.24.x
       - name: Build
-        run: make operator
+        run: make image-build
