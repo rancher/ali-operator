@@ -14,7 +14,7 @@ const defaultNamespace = "default"
 func GetSecrets(secretsCache wranglerv1.SecretCache, spec *aliv1.AliClusterConfigSpec) (*services.Credentials, error) {
 	var cred services.Credentials
 
-	if spec.AlibabaCredentialSecret == "" {
+	if spec == nil || spec.AlibabaCredentialSecret == "" {
 		return nil, fmt.Errorf("secret name not provided")
 	}
 

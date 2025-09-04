@@ -164,12 +164,14 @@ func DeleteNodePool(ctx context.Context, client services.ClustersClientInterface
 
 	nodesResp, err := GetClusterNodes(ctx, client, clusterID, nodePool.NodePoolID)
 	if err != nil {
-		return fmt.Errorf("failed to get nodfes for nodepool %s: %w", nodePool.NodePoolID, err)
+		return fmt.Errorf("failed to get nodes for nodepool %s: %w", nodePool.NodePoolID, err)
 	}
 	if len(nodesResp.Nodes) > 0 {
-		var instanceIDs []*string
+		var instanceIDs []string
 		for _, node := range nodesResp.Nodes {
-			instanceIDs = append(instanceIDs, node.InstanceId)
+			if node.InstanceId != nil {
+				instanceIDs = append(instanceIDs, *node.InstanceId)
+			}
 		}
 		if err := ScaleDownNodePool(ctx, client, clusterID, nodePool.NodePoolID, instanceIDs); err != nil {
 			return fmt.Errorf("failed to scale down nodes for nodepool %s: %w", nodePool.NodePoolID, err)
@@ -185,9 +187,10 @@ func DeleteNodePool(ctx context.Context, client services.ClustersClientInterface
 	return nil
 }
 
-func ScaleDownNodePool(ctx context.Context, client services.ClustersClientInterface, clusterID, npID string, instanceIDs []*string) error {
+func ScaleDownNodePool(ctx context.Context, client services.ClustersClientInterface, clusterID, npID string, instanceIDs []string) error {
 	req := &cs.RemoveNodePoolNodesRequest{
-		InstanceIds: instanceIDs}
+		InstanceIds: tea.StringSlice(instanceIDs),
+	}
 	_, err := client.RemoveNodePoolNodes(ctx, &clusterID, &npID, req)
 	if err != nil {
 		return err
