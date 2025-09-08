@@ -85,11 +85,11 @@ type AliClusterConfigSpec struct {
 	// +kubebuilder:default=false
 	Imported bool `json:"imported" norman:"noupdate"`
 	// Nodepools is a list of node pools associated with the ACK cluster.
-	NodePools []NodePool `json:"nodePools,omitempty"`
-	Addons    []Addon    `json:"addons,omitempty" norman:"noupdate"`
+	NodePools []AliNodePool `json:"nodePools,omitempty"`
+	Addons    []AliAddon    `json:"addons,omitempty" norman:"noupdate"`
 }
 
-type NodePool struct {
+type AliNodePool struct {
 	// nodepool info
 	// NodepoolID is the id of the node pool created. received from Alibaba Cloud.
 	NodePoolID string `json:"nodePoolId,omitempty"`
@@ -114,7 +114,7 @@ type NodePool struct {
 	// AutoRenewPeriod is the auto-renewal period in Month.
 	AutoRenewPeriod int64 `json:"autoRenewPeriod,omitempty" norman:"noupdate"`
 	// DataDisks is the configurations of the data disks that are attached to nodes in the node pool.
-	DataDisks []Disk `json:"dataDisks,omitempty"`
+	DataDisks []AliDisk `json:"dataDisks,omitempty"`
 	// InstanceChargeType is the billing method of nodes in the node pool. Valid values: PrePaid, PostPaid
 	InstanceChargeType string `json:"instanceChargeType,omitempty" norman:"noupdate"`
 	// InstanceTypes the instance types of nodes in the node pool.
@@ -145,7 +145,7 @@ type NodePool struct {
 	RuntimeVersion string `json:"runtimeVersion,omitempty"`
 }
 
-type Disk struct {
+type AliDisk struct {
 	// Category is the category of data disk
 	Category string `json:"category"`
 	// Size is the size of data disks. Unit: GiB
@@ -156,7 +156,7 @@ type Disk struct {
 	AutoSnapshotPolicyID string `json:"autoSnapshotPolicyId"`
 }
 
-type Addon struct {
+type AliAddon struct {
 	// Name is the Addon Component name
 	Name string `json:"name" norman:"noupdate"`
 	// Config is the configuration of the component. usually a JSON string.

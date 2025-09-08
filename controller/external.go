@@ -44,16 +44,19 @@ func BuildUpstreamClusterState(secretsCache wranglerv1.SecretCache, configSpec *
 
 	cluster := clusterResp.Body
 
-	endpointPublicAccess := false
+	endpointPublicAccess := configSpec.EndpointPublicAccess
 	masterURL := tea.StringValue(cluster.MasterUrl)
-
-	masterURLConfig := map[string]interface{}{}
-	err = json.Unmarshal([]byte(masterURL), &masterURLConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing master_url of cluster: %v", err)
-	}
-	if _, ok := masterURLConfig["api_server_endpoint"]; ok {
-		endpointPublicAccess = true
+	if masterURL != "" {
+		masterURLConfig := map[string]interface{}{}
+		err = json.Unmarshal([]byte(masterURL), &masterURLConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing master_url of cluster: %v", err)
+		}
+		if _, ok := masterURLConfig["api_server_endpoint"]; ok {
+			endpointPublicAccess = true
+		} else {
+			endpointPublicAccess = false
+		}
 	}
 
 	newSpec := &aliv1.AliClusterConfigSpec{
@@ -79,11 +82,13 @@ func BuildUpstreamClusterState(secretsCache wranglerv1.SecretCache, configSpec *
 	}
 
 	nodeCIDRMask := tea.StringValue(cluster.NodeCidrMask)
-	nodeCIDRMaskVal, err := strconv.Atoi(nodeCIDRMask)
-	if err != nil {
-		logrus.Warnf("error parsing nodeCIDRMask value:%v", err)
-	} else {
-		newSpec.NodeCIDRMask = nodeCIDRMaskVal
+	if nodeCIDRMask != "" {
+		nodeCIDRMaskVal, err := strconv.Atoi(nodeCIDRMask)
+		if err != nil {
+			logrus.Warnf("error parsing nodeCIDRMask value:%v", err)
+		} else {
+			newSpec.NodeCIDRMask = nodeCIDRMaskVal
+		}
 	}
 
 	nodePools, err := alibaba.GetNodePools(ctx, clustersClient, configSpec)
