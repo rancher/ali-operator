@@ -59,7 +59,7 @@ type AliClusterConfigSpec struct {
 	// NodeCIDRMask is the maximum number of IP addresses that can be assigned to each node.
 	// This number is determined by the subnet mask of the specified CIDR block
 	// only applicable for flannel network plugin
-	NodeCIDRMask int64 `json:"nodeCidrMask,omitempty" norman:"noupdate"`
+	NodeCIDRMask int `json:"nodeCidrMask,omitempty" norman:"noupdate"`
 	// VSwitchIDs is the vSwitches for nodes in the cluster.
 	VSwitchIDs []string `json:"vswitchIds,omitempty" norman:"noupdate"`
 	// PodVswitchIDs is the vSwitches for pods.
@@ -74,11 +74,12 @@ type AliClusterConfigSpec struct {
 	EndpointPublicAccess bool `json:"endpointPublicAccess"`
 	// SecurityGroupID specifies security group for cluster nodes.
 	SecurityGroupID string `json:"securityGroupId,omitempty" norman:"noupdate"`
-	// SSHFlags specifies whether to enable SSH login.
-	// This parameter does not take effect for ACK managed clusters.
-	SSHFlags bool `json:"sshFlags"`
 	// ResourceGroupID the Id of the resource group to which the cluster belongs.
 	ResourceGroupID string `json:"resourceGroupId,omitempty" norman:"noupdate"`
+	// ZoneIDs are the ids of the zones in which vpc and vswitches will be auto created if those fields are not set.
+	ZoneIDs []string `json:"zoneIds,omitempty" norman:"noupdate"`
+	// IsEnterpriseSecurityGroup is used to specify if enterprise security group needs to be created or basic.
+	IsEnterpriseSecurityGroup *bool `json:"isEnterpriseSecurityGroup,omitempty" norman:"noupdate"`
 	// Importer indicates that the cluster was imported.
 	// +optional
 	// +kubebuilder:default=false
@@ -86,14 +87,6 @@ type AliClusterConfigSpec struct {
 	// Nodepools is a list of node pools associated with the ACK cluster.
 	NodePools []NodePool `json:"nodePools,omitempty"`
 	Addons    []Addon    `json:"addons,omitempty" norman:"noupdate"`
-	// PauseClusterUpgrade is used to check if the current cluster upgrade failed
-	// in case true then further updates are not done till the latest task on the cluster
-	// result in success
-	PauseClusterUpgrade bool `json:"pauseClusterUpgrade"`
-	// ClusterIsUpgrading is used to check if the current cluster has some updates running.
-	ClusterIsUpgrading bool `json:"clusterIsUpgrading"`
-	// TaskID is the id of the latest task performed on the cluster.
-	TaskID string `json:"taskId"`
 }
 
 type NodePool struct {
@@ -104,12 +97,16 @@ type NodePool struct {
 	Name string `json:"name,omitempty"`
 
 	// auto_scaling
-	// InstancesNum is used to set the MaxInstances and MinInstances fields in autoscaling config of node pool.
-	// and also as DesiredSize in nodepool scaling group configuration.
-	InstancesNum int64 `json:"instancesNum,omitempty"`
+	// DesiredSize is the desired number of nodes in case of auto scaling disabled.
+	DesiredSize *int64 `json:"desiredSize,omitempty"`
 	// ScalingType is nodepool auto scaling type.
 	ScalingType string `json:"scalingType,omitempty"`
-
+	// EnableAutoScaling specified if we auto scaling is enabled for a node pool.
+	EnableAutoScaling *bool `json:"enableAutoScaling,omitempty"`
+	// MinInstances for auto scaling of node pool.
+	MinInstances *int64 `json:"minInstances,omitempty"`
+	// MaxInstances for auto scaling of node pool.
+	MaxInstances *int64 `json:"maxInstances,omitempty"`
 	// scaling_group
 	// AutoRenew specifies whether to enable auto-renewal for nodes in the node pool.
 	// This parameter takes effect only when you set InstanceChargeType to PrePaid
@@ -170,4 +167,7 @@ type Addon struct {
 type AliClusterConfigStatus struct {
 	Phase          string `json:"phase"`
 	FailureMessage string `json:"failureMessage"`
+	// UpgradeTaskID is the id of the latest upgrade task performed on the cluster.
+	// it is set to empty
+	UpgradeTaskID string `json:"upgradeTaskId"`
 }

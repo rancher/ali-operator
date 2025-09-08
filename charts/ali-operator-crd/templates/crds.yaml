@@ -39,8 +39,6 @@ spec:
               clusterId:
                 nullable: true
                 type: string
-              clusterIsUpgrading:
-                type: boolean
               clusterName:
                 nullable: true
                 type: string
@@ -56,6 +54,9 @@ spec:
               endpointPublicAccess:
                 type: boolean
               imported:
+                type: boolean
+              isEnterpriseSecurityGroup:
+                nullable: true
                 type: boolean
               kubernetesVersion:
                 nullable: true
@@ -86,6 +87,12 @@ spec:
                         type: object
                       nullable: true
                       type: array
+                    desiredSize:
+                      nullable: true
+                      type: integer
+                    enableAutoScaling:
+                      nullable: true
+                      type: boolean
                     imageId:
                       nullable: true
                       type: string
@@ -101,11 +108,15 @@ spec:
                         type: string
                       nullable: true
                       type: array
-                    instancesNum:
-                      type: integer
                     keyPair:
                       nullable: true
                       type: string
+                    maxInstances:
+                      nullable: true
+                      type: integer
+                    minInstances:
+                      nullable: true
+                      type: integer
                     name:
                       nullable: true
                       type: string
@@ -140,8 +151,6 @@ spec:
                   type: object
                 nullable: true
                 type: array
-              pauseClusterUpgrade:
-                type: boolean
               podVswitchIds:
                 items:
                   nullable: true
@@ -165,15 +174,16 @@ spec:
                 type: string
               snatEntry:
                 type: boolean
-              sshFlags:
-                type: boolean
-              taskId:
-                nullable: true
-                type: string
               vpcId:
                 nullable: true
                 type: string
               vswitchIds:
+                items:
+                  nullable: true
+                  type: string
+                nullable: true
+                type: array
+              zoneIds:
                 items:
                   nullable: true
                   type: string
@@ -186,6 +196,9 @@ spec:
                 nullable: true
                 type: string
               phase:
+                nullable: true
+                type: string
+              upgradeTaskId:
                 nullable: true
                 type: string
             type: object
