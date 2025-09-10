@@ -476,8 +476,8 @@ func (h *Handler) updateNodePools(
 	upstreamNodePoolsConfig := alibaba.ToNodePoolConfig(upstreamNodePools)
 
 	// lookup maps
-	nodePoolNameKeyMap := make(map[string]aliv1.NodePool)
-	upstreamNodePoolConfigMap := make(map[string]aliv1.NodePool)
+	nodePoolNameKeyMap := make(map[string]aliv1.AliNodePool)
+	upstreamNodePoolConfigMap := make(map[string]aliv1.AliNodePool)
 	for _, np := range upstreamNodePoolsConfig {
 		upstreamNodePoolConfigMap[np.NodePoolID] = np
 		nodePoolNameKeyMap[np.Name] = np
@@ -492,8 +492,8 @@ func (h *Handler) updateNodePools(
 
 	// classify desired pools
 	var (
-		updateQueue []aliv1.NodePool
-		createQueue []aliv1.NodePool
+		updateQueue []aliv1.AliNodePool
+		createQueue []aliv1.AliNodePool
 	)
 	for _, npConfig := range config.Spec.NodePools {
 		if npConfig.NodePoolID != "" {
@@ -554,7 +554,7 @@ func (h *Handler) handleCreateNodePools(
 	ctx context.Context,
 	client services.ClustersClientInterface,
 	configSpec *aliv1.AliClusterConfigSpec,
-	nodePools []aliv1.NodePool,
+	nodePools []aliv1.AliNodePool,
 ) (bool, error) {
 	var failed []string
 	changed := false
@@ -579,8 +579,8 @@ func (h *Handler) handleCreateNodePools(
 func (h *Handler) handleUpdateNodePools(
 	ctx context.Context,
 	configSpec *aliv1.AliClusterConfigSpec,
-	updateQueue []aliv1.NodePool,
-	upstream map[string]aliv1.NodePool,
+	updateQueue []aliv1.AliNodePool,
+	upstream map[string]aliv1.AliNodePool,
 ) (bool, error) {
 	var failed []string
 	changed := false
@@ -628,8 +628,8 @@ func (h *Handler) handleDeleteNodePools(
 	ctx context.Context,
 	client services.ClustersClientInterface,
 	configSpec *aliv1.AliClusterConfigSpec,
-	existingNodePools []aliv1.NodePool,
-	upstreamPools []aliv1.NodePool,
+	existingNodePools []aliv1.AliNodePool,
+	upstreamPools []aliv1.AliNodePool,
 ) (bool, error) {
 	updatedIDMap := make(map[string]struct{})
 	for _, pool := range existingNodePools {
@@ -651,7 +651,7 @@ func (h *Handler) handleDeleteNodePools(
 	return false, nil
 }
 
-func needsUpdate(desired []aliv1.NodePool, upstream map[string]aliv1.NodePool) bool {
+func needsUpdate(desired []aliv1.AliNodePool, upstream map[string]aliv1.AliNodePool) bool {
 	for _, np := range desired {
 		unp, ok := upstream[np.NodePoolID]
 		if !ok {
@@ -676,7 +676,7 @@ func needsUpdate(desired []aliv1.NodePool, upstream map[string]aliv1.NodePool) b
 }
 
 // needsDelete checks if upstream has pools that aren’t in desired
-func needsDelete(desired []aliv1.NodePool, upstream []aliv1.NodePool) bool {
+func needsDelete(desired []aliv1.AliNodePool, upstream []aliv1.AliNodePool) bool {
 	desiredMap := make(map[string]struct{})
 	for _, d := range desired {
 		desiredMap[d.NodePoolID] = struct{}{}

@@ -25,14 +25,14 @@ func GetNodePools(ctx context.Context, client services.ClustersClientInterface, 
 	return nodePoolsResp.Body.Nodepools, nil
 }
 
-func ToNodePoolConfig(nodePools []*cs.DescribeClusterNodePoolsResponseBodyNodepools) []aliv1.NodePool {
+func ToNodePoolConfig(nodePools []*cs.DescribeClusterNodePoolsResponseBodyNodepools) []aliv1.AliNodePool {
 	// TODO: proper nil checks
-	var nodePoolList []aliv1.NodePool
+	var nodePoolList []aliv1.AliNodePool
 	for _, nodePool := range nodePools {
-		var dataDisks []aliv1.Disk
+		var dataDisks []aliv1.AliDisk
 		if nodePool.ScalingGroup.DataDisks != nil {
 			for _, disk := range nodePool.ScalingGroup.DataDisks {
-				dataDisks = append(dataDisks, aliv1.Disk{
+				dataDisks = append(dataDisks, aliv1.AliDisk{
 					Category:             tea.StringValue(disk.Category),
 					Size:                 tea.Int64Value(disk.Size),
 					Encrypted:            tea.StringValue(disk.Encrypted),
@@ -40,7 +40,7 @@ func ToNodePoolConfig(nodePools []*cs.DescribeClusterNodePoolsResponseBodyNodepo
 				})
 			}
 		}
-		nodePoolList = append(nodePoolList, aliv1.NodePool{
+		nodePoolList = append(nodePoolList, aliv1.AliNodePool{
 			NodePoolID:        tea.StringValue(nodePool.NodepoolInfo.NodepoolId),
 			Name:              tea.StringValue(nodePool.NodepoolInfo.Name),
 			DesiredSize:       nodePool.ScalingGroup.DesiredSize,
@@ -68,7 +68,7 @@ func ToNodePoolConfig(nodePools []*cs.DescribeClusterNodePoolsResponseBodyNodepo
 	return nodePoolList
 }
 
-func CreateNodePool(ctx context.Context, client services.ClustersClientInterface, configSpec *aliv1.AliClusterConfigSpec, npConfig *aliv1.NodePool) (*cs.CreateClusterNodePoolResponseBody, error) {
+func CreateNodePool(ctx context.Context, client services.ClustersClientInterface, configSpec *aliv1.AliClusterConfigSpec, npConfig *aliv1.AliNodePool) (*cs.CreateClusterNodePoolResponseBody, error) {
 	req := newNodePoolCreateRequest(npConfig, &configSpec.ResourceGroupID, configSpec.VSwitchIDs)
 	resp, err := client.CreateClusterNodePool(ctx, &configSpec.ClusterID, req)
 	if err != nil {
@@ -81,7 +81,7 @@ func CreateNodePool(ctx context.Context, client services.ClustersClientInterface
 	return resp.Body, nil
 }
 
-func newNodePoolCreateRequest(npConfig *aliv1.NodePool, resourceGroupID *string, clusterVSwitchIDs []string) *cs.CreateClusterNodePoolRequest {
+func newNodePoolCreateRequest(npConfig *aliv1.AliNodePool, resourceGroupID *string, clusterVSwitchIDs []string) *cs.CreateClusterNodePoolRequest {
 	var dataDiskList []*cs.DataDisk
 	for _, dataDisk := range npConfig.DataDisks {
 		dataDiskList = append(dataDiskList, &cs.DataDisk{
@@ -131,7 +131,7 @@ func newNodePoolCreateRequest(npConfig *aliv1.NodePool, resourceGroupID *string,
 	}
 }
 
-func DeleteNodePool(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePool *aliv1.NodePool) error {
+func DeleteNodePool(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePool *aliv1.AliNodePool) error {
 	var req *cs.ModifyClusterNodePoolRequest
 	if tea.Int64Value(nodePool.DesiredSize) == 0 {
 		req = nil
