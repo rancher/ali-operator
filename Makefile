@@ -44,6 +44,18 @@ operator:
 $(GO_APIDIFF):
 	GOBIN=$(BIN_DIR) $(GO_INSTALL) github.com/joelanford/go-apidiff $(GO_APIDIFF_BIN) $(GO_APIDIFF_VER)
 
+ALL_VERIFY_CHECKS = generate
+
+.PHONY: verify
+verify: $(addprefix verify-,$(ALL_VERIFY_CHECKS))
+
+.PHONY: verify-generate
+verify-generate: generate
+	@if !(git diff --quiet HEAD); then \
+		git diff; \
+		echo "generated files are out of date, run make generate"; exit 1; \
+	fi
+
 .PHONY: buildx-machine
 buildx-machine: ## create rancher dockerbuildx machine targeting platform defined by DEFAULT_PLATFORMS
 	@docker buildx ls | grep $(MACHINE) || \
