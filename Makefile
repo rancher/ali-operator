@@ -6,7 +6,7 @@ ifneq ($(GIT_BRANCH), main)
 GIT_TAG?=$(shell git describe --abbrev=0 --tags 2>/dev/null || echo "v0.0.0" )
 endif
 TAG?=${GIT_TAG}-${GIT_COMMIT_SHORT}
-REPO?=docker.io/rancher
+REPO?=rancher
 IMAGE = $(REPO)/ali-operator:$(TAG)
 MACHINE := rancher
 # Define the target platforms that can be used across the ecosystem.
@@ -44,6 +44,18 @@ operator:
 $(GO_APIDIFF):
 	GOBIN=$(BIN_DIR) $(GO_INSTALL) github.com/joelanford/go-apidiff $(GO_APIDIFF_BIN) $(GO_APIDIFF_VER)
 
+ALL_VERIFY_CHECKS = generate
+
+.PHONY: verify
+verify: $(addprefix verify-,$(ALL_VERIFY_CHECKS))
+
+.PHONY: verify-generate
+verify-generate: generate
+	@if !(git diff --quiet HEAD); then \
+		git diff; \
+		echo "generated files are out of date, run make generate"; exit 1; \
+	fi
+
 .PHONY: buildx-machine
 buildx-machine: ## create rancher dockerbuildx machine targeting platform defined by DEFAULT_PLATFORMS
 	@docker buildx ls | grep $(MACHINE) || \
@@ -53,7 +65,7 @@ buildx-machine: ## create rancher dockerbuildx machine targeting platform define
 image-build: buildx-machine ## build (and load) the container image targeting the current platform.
 	docker buildx build -f package/Dockerfile \
     	--builder $(MACHINE) --build-arg COMMIT=$(GIT_COMMIT) --build-arg VERSION=$(TAG) \
-		--output=type=cacheonly \
+		--output=type=docker \
     	-t "$(IMAGE)" $(BUILD_ACTION) .
 	@echo "Built $(IMAGE)"
 
