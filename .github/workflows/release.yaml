@@ -128,9 +128,36 @@ jobs:
       with:
         fetch-depth: 0
         ref: ${{ github.ref_name}}
+    - name: Create release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required for creating GH release
+        GORELEASER_CURRENT_TAG: ${{ github.ref_name }} # specify the tag to be released
+      id: goreleaser
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: "~> v2"
+        args: release --clean --verbose
+    - name: Upload charts to release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required for updating GH release
+        REPO: rancher # First name component for Docker repository to reference in `values.yaml` of the Helm chart release, this is expected to be `rancher`, image name is appended to this value
+        TAG: ${{ github.ref_name }} # image tag to be referenced in `values.yaml` of the Helm chart release
+      run: |
+        version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
+        echo "Publishing helm charts (version: $version)"
+
+        # Both version and appVersion are set to the same value in the Chart.yaml (excluding the 'v' prefix)
+        CHART_VERSION=$version GIT_TAG=$version make charts
+
+        for f in $(find bin/ -name '*.tgz'); do
+          echo "Uploading $f to GitHub release $TAG"
+          gh release upload $TAG $f
+        done
+        echo "Charts successfully uploaded to GitHub release $TAG"
     - name: Add charts to branch
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         # version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
         # branch_version=v$(echo "$version" | cut -d'.' -f1,2)
