@@ -116,3 +116,48 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
+
+  release:
+    permissions:
+      contents: write # required for creating GH release
+    runs-on: ubuntu-latest
+    needs: publish-images
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.ref_name}}
+    - name: Add charts to branch
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
+        # branch_version=v$(echo "$version" | cut -d'.' -f1,2)
+        # charts_branch=charts/$branch_version
+        charts_branch=charts/v0.1
+        if [ ! -e ~/.gitconfig ]; then
+          git config --global user.name "ali-operator-bot"
+          git config --global user.email ali-operator@suse.de
+        fi
+        echo "Publishing helm chart in the branch $charts_branch"
+        if ! git ls-remote --exit-code --heads origin "$charts_branch"; then
+          git checkout --orphan "$charts_branch"
+          git rm -rf .
+          echo "# Ali Operator Helm Charts for $branch_version versions" > README.md
+          echo "The documentation is centralized in a unique place, checkout https://github.com/rancher/ali-operator." >> README.md
+          git checkout origin/main -- License .gitignore
+          git add README.md License .gitignore
+          git commit -m "Initial commit for $charts_branch"
+        else
+          git checkout .
+          git checkout "$charts_branch"
+        fi
+        mkdir -p charts
+        for f in $(find bin/ -name '*.tgz'); do
+          tar -xf $f -C charts/
+        done
+        git add charts/**/*
+        git commit -m "Update charts to version $version"
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+        git push origin "$charts_branch"
