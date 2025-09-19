@@ -16,3 +16,8 @@ updates:
   commit-message:
     prefix: ":seedling:"
   target-branch: "main"
+  ignore:
+    # Ignore wrangler, k8s and its transitives modules as they will upgraded manually
+    # as per the corresponding minor release of rancher.
+    - dependency-name: "k8s.io/*"
+    - dependency-name: "github.com/rancher/wrangler/v3"
