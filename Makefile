@@ -74,3 +74,23 @@ APIDIFF_OLD_COMMIT ?= $(shell git rev-parse origin/main)
 .PHONY: apidiff
 apidiff: $(GO_APIDIFF) ## Check for API differences
 	$(GO_APIDIFF) $(APIDIFF_OLD_COMMIT) --print-compatible
+
+.PHONY: operator-chart
+operator-chart:
+	mkdir -p $(BIN_DIR)
+	cp -rf $(ROOT_DIR)/charts/ali-operator $(BIN_DIR)/chart
+	sed -i -e 's/tag:.*/tag: '${TAG}'/' $(BIN_DIR)/chart/values.yaml
+	sed -i -e 's|repository:.*|repository: '${REPO}/ali-operator'|' $(BIN_DIR)/chart/values.yaml
+	helm package --version ${CHART_VERSION} --app-version ${GIT_TAG} -d $(BIN_DIR)/ $(BIN_DIR)/chart
+	rm -Rf $(BIN_DIR)/chart
+	
+.PHONY: crd-chart
+crd-chart:
+	mkdir -p $(BIN_DIR)
+	helm package --version ${CHART_VERSION} --app-version ${GIT_TAG} -d $(BIN_DIR)/ $(ROOT_DIR)/charts/ali-operator-crd
+	rm -Rf $(BIN_DIR)/chart
+
+.PHONY: charts
+charts:
+	$(MAKE) operator-chart
+	$(MAKE) crd-chart

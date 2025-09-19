@@ -116,3 +116,92 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
+
+  release:
+    permissions:
+      contents: write # required for creating GH release
+    runs-on: ubuntu-latest
+    needs: merge
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.ref_name}}
+    - name: Create release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required for creating GH release
+        GORELEASER_CURRENT_TAG: ${{ github.ref_name }} # specify the tag to be released
+      id: goreleaser
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: "~> v2"
+        args: release --clean --verbose
+    - name: Upload charts to release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required for updating GH release
+        REPO: rancher # First name component for Docker repository to reference in `values.yaml` of the Helm chart release, this is expected to be `rancher`, image name is appended to this value
+        TAG: ${{ github.ref_name }} # image tag to be referenced in `values.yaml` of the Helm chart release
+      run: |
+        version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
+        if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::Failed to extract version from goreleaser metadata"
+            exit 1
+        fi
+
+        echo "Publishing helm charts (version: $version)"
+
+        # Check if files exist before processing
+        if [ ! -d "bin/" ] || [ -z "$(find bin/ -name '*.tgz')" ]; then
+          echo "No chart files found in bin/ directory"
+          exit 1
+        fi
+
+        # Both version and appVersion are set to the same value in the Chart.yaml (excluding the 'v' prefix)
+        CHART_VERSION=$version GIT_TAG=$version make charts
+
+        for f in $(find bin/ -name '*.tgz'); do
+          echo "Uploading $f to GitHub release $TAG"
+          gh release upload $TAG $f
+        done
+        echo "Charts successfully uploaded to GitHub release $TAG"
+    - name: Add charts to branch
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        # The dynamic version/branch detection is commented out for now because
+        # we haven't cut an official release yet. Instead, we are hardcoding
+        # `charts/v0.1` to publish an initial chart and test the workflow.
+        # Once the first real release is made, we can switch back to using
+        # version-based branches (see commented code below).
+        #
+        # version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
+        # branch_version=v$(echo "$version" | cut -d'.' -f1,2)
+        # charts_branch=charts/$branch_version
+        charts_branch=charts/v0.1
+        if [ ! -e ~/.gitconfig ]; then
+          git config --global user.name "ali-operator-bot"
+          git config --global user.email ali-operator@suse.de
+        fi
+        echo "Publishing helm chart in the branch $charts_branch"
+        if ! git ls-remote --exit-code --heads origin "$charts_branch"; then
+          git checkout --orphan "$charts_branch"
+          git rm -rf .
+          echo "# Ali Operator Helm Charts for $branch_version versions" > README.md
+          echo "The documentation is centralized in a unique place, checkout https://github.com/rancher/ali-operator." >> README.md
+          git checkout origin/main -- License .gitignore
+          git add README.md License .gitignore
+          git commit -m "Initial commit for $charts_branch"
+        else
+          git checkout .
+          git checkout "$charts_branch"
+        fi
+        mkdir -p charts
+        for f in $(find bin/ -name '*.tgz'); do
+          tar -xf $f -C charts/
+        done
+        git add charts/**/*
+        git commit -m "Update charts to version $version"
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+        git push origin "$charts_branch"
