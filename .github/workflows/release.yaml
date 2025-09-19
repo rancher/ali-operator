@@ -145,7 +145,18 @@ jobs:
         TAG: ${{ github.ref_name }} # image tag to be referenced in `values.yaml` of the Helm chart release
       run: |
         version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
+        if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::Failed to extract version from goreleaser metadata"
+            exit 1
+        fi
+
         echo "Publishing helm charts (version: $version)"
+
+        # Check if files exist before processing
+        if [ ! -d "bin/" ] || [ -z "$(find bin/ -name '*.tgz')" ]; then
+          echo "No chart files found in bin/ directory"
+          exit 1
+        fi
 
         # Both version and appVersion are set to the same value in the Chart.yaml (excluding the 'v' prefix)
         CHART_VERSION=$version GIT_TAG=$version make charts
