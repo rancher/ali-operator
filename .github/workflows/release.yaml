@@ -153,19 +153,13 @@ jobs:
         echo "Publishing helm charts (version: $version)"
         
         # Both version and appVersion are set to the same value in the Chart.yaml (excluding the 'v' prefix)
-        CHART_VERSION=$version GIT_TAG=$version make charts~`
+        CHART_VERSION=$version GIT_TAG=$version make charts
 
         # Check if files exist before processing
         if [ ! -d "bin/" ] || [ -z "$(find bin/ -name '*.tgz')" ]; then
           echo "No chart files found in bin/ directory"
           exit 1
         fi
-
-        for f in $(find bin/ -name '*.tgz'); do
-          echo "Uploading $f to GitHub release $TAG"
-          gh release upload $TAG $f
-        done
-        echo "Charts successfully uploaded to GitHub release $TAG"
     - name: Add charts to branch
       env:
         GITHUB_TOKEN: ${{ github.token }}
