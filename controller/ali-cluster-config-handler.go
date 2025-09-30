@@ -40,12 +40,13 @@ type alibabaClients struct {
 }
 
 type Handler struct {
-	aliCC           alicontrollers.AliClusterConfigClient
-	secrets         wranglerv1.SecretClient
-	secretsCache    wranglerv1.SecretCache
-	aliEnqueueAfter func(namespace, name string, duration time.Duration)
-	aliEnqueue      func(namespace, name string)
-	alibabaClients  alibabaClients
+	aliCC            alicontrollers.AliClusterConfigClient
+	secrets          wranglerv1.SecretClient
+	secretsCache     wranglerv1.SecretCache
+	aliEnqueueAfter  func(namespace, name string, duration time.Duration)
+	aliEnqueue       func(namespace, name string)
+	alibabaClients   alibabaClients
+	newAlibabaClient func(credentials *services.Credentials, regionID string) (services.ClustersClientInterface, error)
 }
 
 func Register(
@@ -53,11 +54,12 @@ func Register(
 	secrets wranglerv1.SecretController,
 	ali alicontrollers.AliClusterConfigController) {
 	controller := &Handler{
-		aliCC:           ali,
-		secretsCache:    secrets.Cache(),
-		secrets:         secrets,
-		aliEnqueue:      ali.Enqueue,
-		aliEnqueueAfter: ali.EnqueueAfter,
+		aliCC:            ali,
+		secretsCache:     secrets.Cache(),
+		secrets:          secrets,
+		aliEnqueue:       ali.Enqueue,
+		aliEnqueueAfter:  ali.EnqueueAfter,
+		newAlibabaClient: services.NewClustersClient,
 	}
 
 	// Register handlers
@@ -348,12 +350,16 @@ func (h *Handler) checkAndUpdate(config *aliv1.AliClusterConfig) (*aliv1.AliClus
 }
 
 func (h *Handler) getAlibabaClients(config *aliv1.AliClusterConfig) error {
+	if h.alibabaClients.clustersClient != nil {
+		return nil
+	}
+
 	credentials, err := alibaba.GetSecrets(h.secretsCache, &config.Spec)
 	if err != nil {
 		return fmt.Errorf("error getting credentials: %w", err)
 	}
 
-	clustersClient, err := services.NewClustersClient(credentials, config.Spec.RegionID)
+	clustersClient, err := h.newAlibabaClient(credentials, config.Spec.RegionID)
 	if err != nil {
 		return fmt.Errorf("error creating client secret credential: %w", err)
 	}

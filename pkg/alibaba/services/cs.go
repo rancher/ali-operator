@@ -32,8 +32,8 @@ type clustersClient struct {
 	client *cs.Client
 }
 
-func NewClustersClient(creds *Credentials, regionId string) (*clustersClient, error) {
-	if regionId == "" {
+func NewClustersClient(creds *Credentials, regionID string) (ClustersClientInterface, error) {
+	if regionID == "" {
 		return nil, errEmptyRegion
 	}
 
@@ -45,7 +45,7 @@ func NewClustersClient(creds *Credentials, regionId string) (*clustersClient, er
 	openAPICfg := &openapi.Config{
 		Credential: credentials,
 		Protocol:   tea.String("https"),
-		Endpoint:   tea.String("cs." + regionId + ".aliyuncs.com"),
+		Endpoint:   tea.String("cs." + regionID + ".aliyuncs.com"),
 	}
 
 	client, err := cs.NewClient(openAPICfg)

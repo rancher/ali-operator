@@ -88,9 +88,10 @@ func GetAddons(configSpec *aliv1.AliClusterConfigSpec) []*cs.Addon {
 
 	addons := make([]*cs.Addon, len(configSpec.Addons))
 	for i, addon := range configSpec.Addons {
+		currentAddon := addon
 		addons[i] = &cs.Addon{
-			Name:   &addon.Name,
-			Config: &addon.Config,
+			Name:   &currentAddon.Name,
+			Config: &currentAddon.Config,
 		}
 	}
 
