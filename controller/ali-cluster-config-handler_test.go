@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/ali-operator/pkg/alibaba"
 	"github.com/rancher/ali-operator/pkg/alibaba/services/mock_services"
 	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"
+	"github.com/rancher/ali-operator/pkg/test"
 	cs "github.com/rancher/muchang/cs/client"
 	"github.com/rancher/muchang/utils/tea"
 
@@ -59,9 +60,7 @@ var _ = Describe("importCluster", func() {
 
 	AfterEach(func() {
 		ctrl.Finish()
-		// Clean up created objects
-		_ = aliFactory.Ali().V1().AliClusterConfig().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
-		_ = coreFactory.Core().V1().Secret().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
+		Expect(test.CleanupAndWait(ctx, cl, config)).To(Succeed())
 	})
 
 	It("should import cluster successfully", func() {
@@ -280,7 +279,7 @@ var _ = Describe("recordError", func() {
 	})
 
 	AfterEach(func() {
-		_ = aliFactory.Ali().V1().AliClusterConfig().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
+		Expect(test.CleanupAndWait(ctx, cl, config)).To(Succeed())
 	})
 
 	It("should not update the status if the error message is the same", func() {
@@ -432,7 +431,7 @@ var _ = Describe("create", func() {
 
 	AfterEach(func() {
 		ctrl.Finish()
-		_ = aliFactory.Ali().V1().AliClusterConfig().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
+		Expect(test.CleanupAndWait(ctx, cl, config)).To(Succeed())
 	})
 
 	It("should handle imported cluster", func() {
@@ -535,8 +534,7 @@ var _ = Describe("waitForCreationComplete", func() {
 	AfterEach(func() {
 		ctrl.Finish()
 		close(enqueueChan)
-		_ = aliFactory.Ali().V1().AliClusterConfig().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
-		_ = coreFactory.Core().V1().Secret().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
+		Expect(test.CleanupAndWait(ctx, cl, config)).To(Succeed())
 	})
 
 	It("should enqueue if cluster is still creating", func() {
@@ -643,7 +641,7 @@ var _ = Describe("updateStatus", func() {
 	})
 
 	AfterEach(func() {
-		_ = aliFactory.Ali().V1().AliClusterConfig().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
+		Expect(test.CleanupAndWait(ctx, cl, config)).To(Succeed())
 	})
 
 	It("should update the status of the aliclusterconfig", func() {
@@ -720,8 +718,7 @@ var _ = Describe("handleDeleteNodePools", func() {
 
 	AfterEach(func() {
 		ctrl.Finish()
-		// Clean up created objects
-		_ = aliFactory.Ali().V1().AliClusterConfig().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
+		Expect(test.CleanupAndWait(ctx, cl, config)).To(Succeed())
 	})
 
 	It("should delete node pools successfully", func() {
@@ -815,8 +812,7 @@ var _ = Describe("handleUpdateNodePools", func() {
 
 	AfterEach(func() {
 		ctrl.Finish()
-		// Clean up created objects
-		_ = aliFactory.Ali().V1().AliClusterConfig().Delete(config.Namespace, config.Name, &metav1.DeleteOptions{})
+		Expect(test.CleanupAndWait(ctx, cl, config)).To(Succeed())
 	})
 
 	It("should update node pools autoscaling successfully", func() {
