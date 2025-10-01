@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
+	cs "github.com/rancher/muchang/cs/client"
 
 	"github.com/rancher/ali-operator/pkg/alibaba/services"
 	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"

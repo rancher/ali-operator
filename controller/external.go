@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strconv"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
-	"github.com/alibabacloud-go/tea/tea"
 	"github.com/rancher/ali-operator/pkg/alibaba"
 	"github.com/rancher/ali-operator/pkg/alibaba/services"
 	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"
+	cs "github.com/rancher/muchang/cs/client"
+	"github.com/rancher/muchang/utils/tea"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 )
