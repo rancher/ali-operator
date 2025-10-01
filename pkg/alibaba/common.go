@@ -3,9 +3,9 @@ package alibaba
 import (
 	"strconv"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
-	"github.com/alibabacloud-go/tea/tea"
 	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"
+	cs "github.com/rancher/muchang/cs/client"
+	"github.com/rancher/muchang/utils/tea"
 	"github.com/sirupsen/logrus"
 )
 

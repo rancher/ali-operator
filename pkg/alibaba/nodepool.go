@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
 	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"
+	cs "github.com/rancher/muchang/cs/client"
 	"github.com/sirupsen/logrus"
 
-	"github.com/alibabacloud-go/tea/tea"
 	"github.com/rancher/ali-operator/pkg/alibaba/services"
+	"github.com/rancher/muchang/utils/tea"
 )
 
 func GetNodePools(ctx context.Context, client services.ClustersClientInterface, configSpec *aliv1.AliClusterConfigSpec) ([]*cs.DescribeClusterNodePoolsResponseBodyNodepools, error) {

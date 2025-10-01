@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
-	"github.com/alibabacloud-go/tea/tea"
+	cs "github.com/rancher/muchang/cs/client"
+	"github.com/rancher/muchang/utils/tea"
 
 	"github.com/rancher/ali-operator/pkg/alibaba"
 	"github.com/rancher/ali-operator/pkg/alibaba/services"
