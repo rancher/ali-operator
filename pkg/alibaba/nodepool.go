@@ -26,44 +26,53 @@ func GetNodePools(ctx context.Context, client services.ClustersClientInterface, 
 }
 
 func ToNodePoolConfig(nodePools []*cs.DescribeClusterNodePoolsResponseBodyNodepools) []aliv1.AliNodePool {
-	// TODO: proper nil checks
 	var nodePoolList []aliv1.AliNodePool
 	for _, nodePool := range nodePools {
 		var dataDisks []aliv1.AliDisk
 		if nodePool.ScalingGroup.DataDisks != nil {
 			for _, disk := range nodePool.ScalingGroup.DataDisks {
-				dataDisks = append(dataDisks, aliv1.AliDisk{
-					Category:             tea.StringValue(disk.Category),
-					Size:                 tea.Int64Value(disk.Size),
-					Encrypted:            tea.StringValue(disk.Encrypted),
-					AutoSnapshotPolicyID: tea.StringValue(disk.AutoSnapshotPolicyId),
-				})
+				if disk != nil {
+					dataDisks = append(dataDisks, aliv1.AliDisk{
+						Category:             tea.StringValue(disk.Category),
+						Size:                 tea.Int64Value(disk.Size),
+						Encrypted:            tea.StringValue(disk.Encrypted),
+						AutoSnapshotPolicyID: tea.StringValue(disk.AutoSnapshotPolicyId),
+					})
+				}
 			}
 		}
-		nodePoolList = append(nodePoolList, aliv1.AliNodePool{
-			NodePoolID:        tea.StringValue(nodePool.NodepoolInfo.NodepoolId),
-			Name:              tea.StringValue(nodePool.NodepoolInfo.Name),
-			DesiredSize:       nodePool.ScalingGroup.DesiredSize,
-			ScalingType:       tea.StringValue(nodePool.AutoScaling.Type),
-			EnableAutoScaling: nodePool.AutoScaling.Enable,
-			MaxInstances:      nodePool.AutoScaling.MaxInstances,
-			MinInstances:      nodePool.AutoScaling.MinInstances,
-			/* scaling_group */
-			AutoRenew:          tea.BoolValue(nodePool.ScalingGroup.AutoRenew),
-			AutoRenewPeriod:    tea.Int64Value(nodePool.ScalingGroup.AutoRenewPeriod),
-			DataDisks:          dataDisks,
-			InstanceChargeType: tea.StringValue(nodePool.ScalingGroup.InstanceChargeType),
-			InstanceTypes:      tea.StringSliceValue(nodePool.ScalingGroup.InstanceTypes),
-			KeyPair:            tea.StringValue(nodePool.ScalingGroup.KeyPair),
-			Period:             tea.Int64Value(nodePool.ScalingGroup.Period),
-			PeriodUnit:         tea.StringValue(nodePool.ScalingGroup.PeriodUnit),
-			ImageType:          tea.StringValue(nodePool.ScalingGroup.ImageType),
-			SystemDiskCategory: tea.StringValue(nodePool.ScalingGroup.SystemDiskCategory),
-			SystemDiskSize:     tea.Int64Value(nodePool.ScalingGroup.SystemDiskSize),
-			VSwitchIDs:         tea.StringSliceValue(nodePool.ScalingGroup.VswitchIds),
-			Runtime:            tea.StringValue(nodePool.KubernetesConfig.Runtime),
-			RuntimeVersion:     tea.StringValue(nodePool.KubernetesConfig.RuntimeVersion),
-		})
+		np := aliv1.AliNodePool{
+			DataDisks: dataDisks,
+		}
+		if nodePool.NodepoolInfo != nil {
+			np.NodePoolID = tea.StringValue(nodePool.NodepoolInfo.NodepoolId)
+			np.Name = tea.StringValue(nodePool.NodepoolInfo.Name)
+		}
+		if nodePool.ScalingGroup != nil {
+			np.DesiredSize = nodePool.ScalingGroup.DesiredSize
+			np.AutoRenew = tea.BoolValue(nodePool.ScalingGroup.AutoRenew)
+			np.AutoRenewPeriod = tea.Int64Value(nodePool.ScalingGroup.AutoRenewPeriod)
+			np.InstanceChargeType = tea.StringValue(nodePool.ScalingGroup.InstanceChargeType)
+			np.InstanceTypes = tea.StringSliceValue(nodePool.ScalingGroup.InstanceTypes)
+			np.KeyPair = tea.StringValue(nodePool.ScalingGroup.KeyPair)
+			np.Period = tea.Int64Value(nodePool.ScalingGroup.Period)
+			np.PeriodUnit = tea.StringValue(nodePool.ScalingGroup.PeriodUnit)
+			np.ImageType = tea.StringValue(nodePool.ScalingGroup.ImageType)
+			np.SystemDiskCategory = tea.StringValue(nodePool.ScalingGroup.SystemDiskCategory)
+			np.SystemDiskSize = tea.Int64Value(nodePool.ScalingGroup.SystemDiskSize)
+			np.VSwitchIDs = tea.StringSliceValue(nodePool.ScalingGroup.VswitchIds)
+		}
+		if nodePool.AutoScaling != nil {
+			np.ScalingType = tea.StringValue(nodePool.AutoScaling.Type)
+			np.EnableAutoScaling = nodePool.AutoScaling.Enable
+			np.MaxInstances = nodePool.AutoScaling.MaxInstances
+			np.MinInstances = nodePool.AutoScaling.MinInstances
+		}
+		if nodePool.KubernetesConfig != nil {
+			np.Runtime = tea.StringValue(nodePool.KubernetesConfig.Runtime)
+			np.RuntimeVersion = tea.StringValue(nodePool.KubernetesConfig.RuntimeVersion)
+		}
+		nodePoolList = append(nodePoolList, np)
 	}
 	return nodePoolList
 }

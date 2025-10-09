@@ -101,7 +101,7 @@ type AliNodePool struct {
 	DesiredSize *int64 `json:"desiredSize,omitempty"`
 	// ScalingType is nodepool auto scaling type.
 	ScalingType string `json:"scalingType,omitempty"`
-	// EnableAutoScaling specified if we auto scaling is enabled for a node pool.
+	// EnableAutoScaling specified if auto scaling is enabled for a node pool.
 	EnableAutoScaling *bool `json:"enableAutoScaling,omitempty"`
 	// MinInstances for auto scaling of node pool.
 	MinInstances *int64 `json:"minInstances,omitempty"`
