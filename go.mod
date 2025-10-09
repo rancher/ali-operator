@@ -7,9 +7,9 @@ toolchain go1.24.7
 replace google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
-	github.com/rancher/lasso v0.2.5-rc.1
+	github.com/rancher/lasso v0.2.5
 	github.com/rancher/muchang v0.0.0-20250924102543-edfa278ae47f
-	github.com/rancher/wrangler/v3 v3.3.0
+	github.com/rancher/wrangler/v3 v3.3.1
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
