@@ -192,6 +192,7 @@ func (h *Handler) importCluster(config *aliv1.AliClusterConfig) (*aliv1.AliClust
 		}
 	}
 
+	config = config.DeepCopy()
 	config.Status.Phase = aliConfigActivePhase
 	return h.aliCC.UpdateStatus(config)
 }
@@ -444,12 +445,15 @@ func (h *Handler) updateUpstreamClusterState(config *aliv1.AliClusterConfig) (*a
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	changed, err := h.updateNodePools(ctx, config)
-	if err != nil {
-		return config, err
-	}
-	if changed {
-		return h.enqueueUpdate(config, 0)
+	// nodepool nil check is needed otherwise in case of imported cluster all the nodepools will be removed.
+	if config.Spec.NodePools != nil {
+		changed, err := h.updateNodePools(ctx, config)
+		if err != nil {
+			return config, err
+		}
+		if changed {
+			return h.enqueueUpdate(config, 0)
+		}
 	}
 
 	// no new updates, set to active
