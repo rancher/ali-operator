@@ -6,122 +6,11 @@ on:
       - 'v*'
 
 jobs:
-  publish-images:
-    permissions:
-      contents: read
-      id-token: write
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-    - name: Read secrets
-      uses: rancher-eio/read-vault-secrets@main
-      with:
-        secrets: |
-          secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry |  STAGE_REGISTRY_REGISTRY;
-          secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username |  STAGE_REGISTRY_USERNAME;
-          secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password |  STAGE_REGISTRY_PASSWORD;
-    - name: Setup Environment Variables
-      run: |
-        echo "IMAGE=${{ env.STAGE_REGISTRY_REGISTRY }}/rancher/ali-operator" >> $GITHUB_ENV
-    - name: Docker meta
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.IMAGE }}
-        flavor: |
-          latest=false
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Login to Staging Registry
-      uses: docker/login-action@v3
-      with:
-        username: ${{ env.STAGE_REGISTRY_USERNAME }}
-        password: ${{ env.STAGE_REGISTRY_PASSWORD }}
-        registry: ${{ env.STAGE_REGISTRY_REGISTRY }}
-    - name: Build and push Docker image
-      id: build
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: package/Dockerfile
-        push: true
-        platforms: linux/${{ matrix.arch }}
-        tags: ${{ env.IMAGE }}:${{ github.ref_name }}-linux-${{ matrix.arch }}
-        build-args: ARCH=${{ matrix.arch }}
-        labels: "${{ steps.meta.outputs.labels }}"
-    - name: Export digest
-      run: |
-        mkdir -p /tmp/digests
-        digest="${{ steps.build.outputs.digest }}"
-        touch "/tmp/digests/${digest#sha256:}"
-    - name: Upload digest
-      uses: actions/upload-artifact@v4
-      with:
-        name: "digests-linux-${{ matrix.arch }}"
-        path: /tmp/digests/*
-        if-no-files-found: error
-        retention-days: 1
-        overwrite: true
-
-  merge:
-    runs-on: ubuntu-latest
-    needs: publish-images
-    permissions:
-      contents: read
-      id-token: write 
-    timeout-minutes: 10
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@v5
-        with:
-          path: /tmp/digests
-          pattern: digests-*
-          merge-multiple: true
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry |  STAGE_REGISTRY_REGISTRY;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username |  STAGE_REGISTRY_USERNAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password |  STAGE_REGISTRY_PASSWORD;
-      - name: Setup Environment Variables
-        run: |
-          echo "IMAGE=${{ env.STAGE_REGISTRY_REGISTRY }}/rancher/ali-operator" >> $GITHUB_ENV
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          flavor: |
-            latest=false
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.STAGE_REGISTRY_USERNAME }}
-          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
-          registry: ${{ env.STAGE_REGISTRY_REGISTRY }}
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
 
   release:
     permissions:
       contents: write # required for creating GH release
     runs-on: ubuntu-latest
-    needs: merge
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -183,7 +72,7 @@ jobs:
           git checkout --orphan "$charts_branch"
           git rm -rf .
           echo "# Ali Operator Helm Charts for $branch_version versions" > README.md
-          echo "The documentation is centralized in a unique place, checkout https://github.com/rancher/ali-operator." >> README.md
+          echo "The documentation is centralized in a unique place, checkout https://github.com/krunalhinguu/ali-operator." >> README.md
           git checkout origin/main -- License .gitignore
           git add README.md License .gitignore
           git commit -m "Initial commit for $charts_branch"
