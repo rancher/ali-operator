@@ -184,8 +184,8 @@ jobs:
           git rm -rf .
           echo "# Ali Operator Helm Charts for $branch_version versions" > README.md
           echo "The documentation is centralized in a unique place, checkout https://github.com/rancher/ali-operator." >> README.md
-          git checkout origin/main -- License .gitignore
-          git add README.md License .gitignore
+          git checkout origin/main -- LICENSE .gitignore
+          git add README.md LICENSE .gitignore
           git commit -m "Initial commit for $charts_branch"
         else
           git checkout .
