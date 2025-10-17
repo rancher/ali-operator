@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/rancher/ali-operator/pkg/alibaba"
 	"github.com/rancher/ali-operator/pkg/alibaba/services"
@@ -53,32 +54,55 @@ func BuildUpstreamClusterState(secretsCache wranglerv1.SecretCache, configSpec *
 			return nil, fmt.Errorf("error parsing master_url of cluster: %v", err)
 		}
 		if _, ok := masterURLConfig["api_server_endpoint"]; ok {
-			endpointPublicAccess = true
+			endpointPublicAccess = tea.Bool(true)
 		} else {
-			endpointPublicAccess = false
+			endpointPublicAccess = tea.Bool(false)
 		}
 	}
 
 	newSpec := &aliv1.AliClusterConfigSpec{
-		ClusterName:          tea.StringValue(cluster.Name),
-		ClusterID:            tea.StringValue(cluster.ClusterId),
-		ClusterType:          tea.StringValue(cluster.ClusterType),
-		ClusterSpec:          tea.StringValue(cluster.ClusterSpec),
-		KubernetesVersion:    tea.StringValue(cluster.CurrentVersion),
-		RegionID:             tea.StringValue(cluster.RegionId),
-		VpcID:                tea.StringValue(cluster.VpcId),
-		VSwitchIDs:           tea.StringSliceValue(cluster.VswitchIds),
-		ContainerCIDR:        tea.StringValue(cluster.ContainerCidr),
-		ServiceCIDR:          tea.StringValue(cluster.ServiceCidr),
-		EndpointPublicAccess: endpointPublicAccess,
-		ProxyMode:            tea.StringValue(cluster.ProxyMode),
-		SecurityGroupID:      tea.StringValue(cluster.SecurityGroupId),
-		ResourceGroupID:      tea.StringValue(cluster.ResourceGroupId),
-		// setting the fields from config spec which can only be set while creation to make things consistent.
-		ZoneIDs:                   configSpec.ZoneIDs,
-		PodVswitchIDs:             configSpec.PodVswitchIDs,
+		ClusterName:               tea.StringValue(cluster.Name),
+		ClusterID:                 tea.StringValue(cluster.ClusterId),
+		ClusterType:               tea.StringValue(cluster.ClusterType),
+		ClusterSpec:               tea.StringValue(cluster.ClusterSpec),
+		KubernetesVersion:         tea.StringValue(cluster.CurrentVersion),
+		RegionID:                  tea.StringValue(cluster.RegionId),
+		VpcID:                     tea.StringValue(cluster.VpcId),
+		VSwitchIDs:                tea.StringSliceValue(cluster.VswitchIds),
+		ContainerCIDR:             tea.StringValue(cluster.ContainerCidr),
+		ServiceCIDR:               tea.StringValue(cluster.ServiceCidr),
+		EndpointPublicAccess:      endpointPublicAccess,
+		ProxyMode:                 tea.StringValue(cluster.ProxyMode),
+		SecurityGroupID:           tea.StringValue(cluster.SecurityGroupId),
+		ResourceGroupID:           tea.StringValue(cluster.ResourceGroupId),
 		IsEnterpriseSecurityGroup: configSpec.IsEnterpriseSecurityGroup,
-		SNATEntry:                 configSpec.SNATEntry,
+	}
+
+	// if zoneIDs are present in config spec then keep the same otherwise add the cluster zoneId
+	if len(configSpec.ZoneIDs) > 0 {
+		newSpec.ZoneIDs = configSpec.ZoneIDs
+	} else {
+		newSpec.ZoneIDs = []string{tea.StringValue(cluster.ZoneId)}
+	}
+
+	if cluster.Parameters != nil {
+		if snatEntryVal, ok := cluster.Parameters["SNatEntry"]; ok && snatEntryVal != nil && *snatEntryVal != "" {
+			snatVal := strings.ToLower(tea.StringValue(snatEntryVal)) == "true"
+			newSpec.SNATEntry = tea.Bool(snatVal)
+		}
+
+		if vswitchIDsVal, ok := cluster.Parameters["PodVswitchIds"]; ok && vswitchIDsVal != nil {
+			var podVswitchIDs []string
+			if tea.StringValue(vswitchIDsVal) != "" && tea.StringValue(vswitchIDsVal) != "[]" {
+				if err := json.Unmarshal([]byte(tea.StringValue(vswitchIDsVal)), &podVswitchIDs); err != nil {
+					logrus.Warnf("failed to parse PodVswitchIds value: %v", err)
+				}
+			}
+
+			if len(podVswitchIDs) > 0 {
+				newSpec.PodVswitchIDs = podVswitchIDs
+			}
+		}
 	}
 
 	nodeCIDRMask := tea.StringValue(cluster.NodeCidrMask)

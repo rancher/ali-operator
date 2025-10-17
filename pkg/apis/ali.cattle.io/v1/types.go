@@ -67,11 +67,11 @@ type AliClusterConfigSpec struct {
 	PodVswitchIDs []string `json:"podVswitchIds,omitempty" norman:"noupdate"`
 	// SNATEntry specifies whether to configure SNAT rules for the VPC in which your cluster is deployed.
 	// if false nodes and applications in the cluster cannot access the Internet.
-	SNATEntry bool `json:"snatEntry"`
+	SNATEntry *bool `json:"snatEntry,omitempty"`
 	// ProxyMode the kube-proxy mode
 	ProxyMode string `json:"proxyMode,omitempty"`
 	// EndpointPublicAccess specifies whether to enable Internet access for the cluster.
-	EndpointPublicAccess bool `json:"endpointPublicAccess"`
+	EndpointPublicAccess *bool `json:"endpointPublicAccess,omitempty"`
 	// SecurityGroupID specifies security group for cluster nodes.
 	SecurityGroupID string `json:"securityGroupId,omitempty" norman:"noupdate"`
 	// ResourceGroupID the Id of the resource group to which the cluster belongs.
@@ -133,7 +133,7 @@ type AliNodePool struct {
 	// ImageType is the type of the OS image
 	ImageType string `json:"imageType,omitempty"`
 	// VSwitchIDs are the VSwitchIds for the nodes.
-	VSwitchIDs []string `json:"vSwitchIds,omitempty"`
+	VSwitchIDs []string `json:"vswitchIds,omitempty"`
 	// SystemDiskCategory is the category of the system disk.
 	SystemDiskCategory string `json:"systemDiskCategory,omitempty"`
 	// SystemDiskSize is the size of the system disk

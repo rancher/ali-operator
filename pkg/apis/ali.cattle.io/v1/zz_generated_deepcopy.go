@@ -115,6 +115,16 @@ func (in *AliClusterConfigSpec) DeepCopyInto(out *AliClusterConfigSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.SNATEntry != nil {
+		in, out := &in.SNATEntry, &out.SNATEntry
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EndpointPublicAccess != nil {
+		in, out := &in.EndpointPublicAccess, &out.EndpointPublicAccess
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ZoneIDs != nil {
 		in, out := &in.ZoneIDs, &out.ZoneIDs
 		*out = make([]string, len(*in))
