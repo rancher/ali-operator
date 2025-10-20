@@ -58,6 +58,7 @@ func ToNodePoolConfig(nodePools []*cs.DescribeClusterNodePoolsResponseBodyNodepo
 			np.Period = tea.Int64Value(nodePool.ScalingGroup.Period)
 			np.PeriodUnit = tea.StringValue(nodePool.ScalingGroup.PeriodUnit)
 			np.ImageType = tea.StringValue(nodePool.ScalingGroup.ImageType)
+			np.ImageID = tea.StringValue(nodePool.ScalingGroup.ImageId)
 			np.SystemDiskCategory = tea.StringValue(nodePool.ScalingGroup.SystemDiskCategory)
 			np.SystemDiskSize = tea.Int64Value(nodePool.ScalingGroup.SystemDiskSize)
 			np.VSwitchIDs = tea.StringSliceValue(nodePool.ScalingGroup.VswitchIds)
