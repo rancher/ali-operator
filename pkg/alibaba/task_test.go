@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rancher/ali-operator/pkg/alibaba/services/mock_services"
 	cs "github.com/rancher/muchang/cs/client"
 	"github.com/rancher/muchang/utils/tea"
+	"go.uber.org/mock/gomock"
 )
 
 var _ = Describe("GetTask", func() {
