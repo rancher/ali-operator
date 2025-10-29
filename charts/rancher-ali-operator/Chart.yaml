@@ -11,10 +11,10 @@ annotations:
   catalog.cattle.io/release-name: rancher-ali-operator
   catalog.cattle.io/scope: management
 apiVersion: v2
-appVersion: 0.0.5
+appVersion: 0.0.6
 description: A Helm chart for provisioning ACK clusters
 home: https://github.com/rancher/ali-operator
 name: rancher-ali-operator
 sources:
 - https://github.com/rancher/ali-operator
-version: 0.0.5
+version: 0.0.6
