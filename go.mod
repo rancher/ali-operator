@@ -2,7 +2,7 @@ module github.com/rancher/ali-operator
 
 go 1.24.0
 
-toolchain go1.24.7
+toolchain go1.24.9
 
 replace google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
