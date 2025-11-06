@@ -164,16 +164,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
       run: |
-        # The dynamic version/branch detection is commented out for now because
-        # we haven't cut an official release yet. Instead, we are hardcoding
-        # `charts/v0.1` to publish an initial chart and test the workflow.
-        # Once the first real release is made, we can switch back to using
-        # version-based branches (see commented code below).
-        #
-        # version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
-        # branch_version=v$(echo "$version" | cut -d'.' -f1,2)
-        # charts_branch=charts/$branch_version
-        charts_branch=charts/v0.1
+        version=$(echo '${{ steps.goreleaser.outputs.metadata }}' | jq -r '.version')
+        branch_version=v$(echo "$version" | cut -d'.' -f1,2)
+        charts_branch=charts/$branch_version
         if [ ! -e ~/.gitconfig ]; then
           git config --global user.name "ali-operator-bot"
           git config --global user.email ali-operator@suse.de
