@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.2.5
-	github.com/rancher/muchang v0.0.0-20250924102543-edfa278ae47f
+	github.com/rancher/muchang v0.0.0-20251013062203-2b2d84128646
 	github.com/rancher/wrangler/v3 v3.3.1
 	github.com/sirupsen/logrus v1.9.3
 	go.uber.org/mock v0.6.0
