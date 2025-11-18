@@ -452,7 +452,7 @@ func (h *Handler) updateUpstreamClusterState(config *aliv1.AliClusterConfig) (*a
 			return config, err
 		}
 		if changed {
-			return h.enqueueUpdate(config, 0)
+			return h.enqueueUpdate(config, enqueuePeriod)
 		}
 	}
 
