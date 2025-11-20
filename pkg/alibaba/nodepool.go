@@ -231,10 +231,10 @@ func WaitForNodePool(state *string) bool {
 		*state == NodePoolStatusUpdating || *state == NodePoolStatusRemoving || *state == NodePoolStatusRemovingNodes
 }
 
-func UpdateNodePoolAutoScalingConfig(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePoolID string, maxInstances *int64, minInstances *int64) error {
+func UpdateNodePoolAutoScalingConfig(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePoolID string, enable bool, maxInstances *int64, minInstances *int64) error {
 	req := &cs.ModifyClusterNodePoolRequest{
 		AutoScaling: &cs.ModifyClusterNodePoolRequestAutoScaling{
-			Enable:       tea.Bool(true),
+			Enable:       tea.Bool(enable), // Use the passed argument
 			MaxInstances: maxInstances,
 			MinInstances: minInstances,
 		},

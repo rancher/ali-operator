@@ -333,14 +333,14 @@ var _ = Describe("UpdateNodePoolAutoScalingConfig", func() {
 
 	It("should update autoscaling config successfully", func() {
 		clustersClientMock.EXPECT().ModifyClusterNodePool(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
-		err := UpdateNodePoolAutoScalingConfig(context.Background(), clustersClientMock, "c1", "np1", tea.Int64(5), tea.Int64(1))
+		err := UpdateNodePoolAutoScalingConfig(context.Background(), clustersClientMock, "c1", "np1", true, tea.Int64(5), tea.Int64(1))
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should return an error if API fails", func() {
 		apiError := errors.New("API error")
 		clustersClientMock.EXPECT().ModifyClusterNodePool(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, apiError)
-		err := UpdateNodePoolAutoScalingConfig(context.Background(), clustersClientMock, "c1", "np1", tea.Int64(5), tea.Int64(1))
+		err := UpdateNodePoolAutoScalingConfig(context.Background(), clustersClientMock, "c1", "np1", true, tea.Int64(5), tea.Int64(1))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(Equal(apiError))
 	})

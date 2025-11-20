@@ -593,32 +593,40 @@ func (h *Handler) handleUpdateNodePools(
 		if !ok {
 			continue
 		}
-		if tea.BoolValue(unp.EnableAutoScaling) != tea.BoolValue(np.EnableAutoScaling) {
-			logrus.Warnf("Skipping update for nodepool [%s], scaling configuration mismatch in cluster [%s]", unp.Name, configSpec.ClusterName)
-			continue
-		}
-		if np.EnableAutoScaling != nil && np.MinInstances != nil && np.MaxInstances != nil &&
-			unp.EnableAutoScaling != nil && tea.BoolValue(unp.EnableAutoScaling) && tea.BoolValue(np.EnableAutoScaling) &&
-			(tea.Int64Value(np.MaxInstances) != tea.Int64Value(unp.MaxInstances) ||
-				tea.Int64Value(np.MinInstances) != tea.Int64Value(unp.MinInstances)) {
 
-			logrus.Infof("Updating nodepool [%s] in cluster [%s] from maxInstances:[%d] minInstance: [%d] to maxInstances:[%d] minInstance: [%d]",
-				np.Name, configSpec.ClusterName, tea.Int64Value(unp.MaxInstances), tea.Int64Value(unp.MinInstances), tea.Int64Value(np.MaxInstances), tea.Int64Value(np.MinInstances))
-			err := alibaba.UpdateNodePoolAutoScalingConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, np.MaxInstances, np.MinInstances)
-			if err != nil {
-				failed = append(failed, fmt.Sprintf("nodepool %s autoscaling update error: %s", np.Name, err.Error()))
-				continue
+		if tea.BoolValue(np.EnableAutoScaling) {
+			if !tea.BoolValue(unp.EnableAutoScaling) ||
+				(tea.Int64Value(np.MaxInstances) != tea.Int64Value(unp.MaxInstances)) ||
+				(tea.Int64Value(np.MinInstances) != tea.Int64Value(unp.MinInstances)) {
+				logrus.Infof("Updating nodepool [%s] in cluster [%s] AutoScaling config", np.Name, configSpec.ClusterName)
+				err := alibaba.UpdateNodePoolAutoScalingConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, true, np.MaxInstances, np.MinInstances)
+				if err != nil {
+					failed = append(failed, fmt.Sprintf("nodepool %s autoscaling update error: %s", np.Name, err.Error()))
+					continue
+				}
+				changed = true
 			}
-			changed = true
-		} else if np.DesiredSize != nil && unp.DesiredSize != nil && tea.Int64Value(np.DesiredSize) != tea.Int64Value(unp.DesiredSize) {
-			logrus.Infof("Updating desired size for nodepool [%s] in cluster [%s] from %d to %d",
-				np.Name, configSpec.ClusterName, tea.Int64Value(unp.DesiredSize), tea.Int64Value(np.DesiredSize))
-			err := alibaba.UpdateNodePoolDesiredSize(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, np.DesiredSize)
-			if err != nil {
-				failed = append(failed, fmt.Sprintf("nodepool %s desired size update error: %s", np.Name, err.Error()))
-				continue
+		} else {
+			if tea.BoolValue(unp.EnableAutoScaling) {
+				logrus.Infof("Disabling AutoScaling for nodepool [%s] in cluster [%s]", np.Name, configSpec.ClusterName)
+				err := alibaba.UpdateNodePoolAutoScalingConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, false, nil, nil)
+				if err != nil {
+					failed = append(failed, fmt.Sprintf("nodepool %s autoscaling disable error: %s", np.Name, err.Error()))
+					continue
+				}
+				changed = true
 			}
-			changed = true
+
+			if np.DesiredSize != nil && unp.DesiredSize != nil && tea.Int64Value(np.DesiredSize) != tea.Int64Value(unp.DesiredSize) {
+				logrus.Infof("Updating desired size for nodepool [%s] in cluster [%s] from %d to %d",
+					np.Name, configSpec.ClusterName, tea.Int64Value(unp.DesiredSize), tea.Int64Value(np.DesiredSize))
+				err := alibaba.UpdateNodePoolDesiredSize(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, np.DesiredSize)
+				if err != nil {
+					failed = append(failed, fmt.Sprintf("nodepool %s desired size update error: %s", np.Name, err.Error()))
+					continue
+				}
+				changed = true
+			}
 		}
 	}
 	if len(failed) > 0 {
@@ -660,6 +668,10 @@ func needsUpdate(desired []aliv1.AliNodePool, upstream map[string]aliv1.AliNodeP
 		unp, ok := upstream[np.NodePoolID]
 		if !ok {
 			continue
+		}
+
+		if tea.BoolValue(np.EnableAutoScaling) != tea.BoolValue(unp.EnableAutoScaling) {
+			return true
 		}
 		// AutoScaling mismatch
 		if np.EnableAutoScaling != nil && unp.EnableAutoScaling != nil {
