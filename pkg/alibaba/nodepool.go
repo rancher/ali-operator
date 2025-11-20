@@ -176,6 +176,12 @@ func DeleteNodePool(ctx context.Context, client services.ClustersClientInterface
 	if err != nil {
 		return fmt.Errorf("failed to get nodes for nodepool %s: %w", nodePool.NodePoolID, err)
 	}
+	isAutoscaled := nodePool.EnableAutoScaling != nil || (nodePool.MinInstances != nil && nodePool.MaxInstances != nil)
+
+	if isAutoscaled && len(nodesResp.Nodes) > 0 {
+		logrus.Infof("Waiting for autoscaler to terminate %d nodes in nodepool %s", len(nodesResp.Nodes), nodePool.NodePoolID)
+		return nil
+	}
 	if len(nodesResp.Nodes) > 0 {
 		var instanceIDs []string
 		for _, node := range nodesResp.Nodes {
@@ -231,10 +237,10 @@ func WaitForNodePool(state *string) bool {
 		*state == NodePoolStatusUpdating || *state == NodePoolStatusRemoving || *state == NodePoolStatusRemovingNodes
 }
 
-func UpdateNodePoolAutoScalingConfig(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePoolID string, maxInstances *int64, minInstances *int64) error {
+func UpdateNodePoolAutoScalingConfig(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePoolID string, enable bool, maxInstances *int64, minInstances *int64) error {
 	req := &cs.ModifyClusterNodePoolRequest{
 		AutoScaling: &cs.ModifyClusterNodePoolRequestAutoScaling{
-			Enable:       tea.Bool(true),
+			Enable:       tea.Bool(enable), // Use the passed argument
 			MaxInstances: maxInstances,
 			MinInstances: minInstances,
 		},
