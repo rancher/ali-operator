@@ -176,7 +176,7 @@ func DeleteNodePool(ctx context.Context, client services.ClustersClientInterface
 	if err != nil {
 		return fmt.Errorf("failed to get nodes for nodepool %s: %w", nodePool.NodePoolID, err)
 	}
-	isAutoscaled := nodePool.EnableAutoScaling != nil || (nodePool.MinInstances != nil && nodePool.MaxInstances != nil)
+	isAutoscaled := tea.BoolValue(nodePool.EnableAutoScaling)
 
 	if isAutoscaled && len(nodesResp.Nodes) > 0 {
 		logrus.Infof("Waiting for autoscaler to terminate %d nodes in nodepool %s", len(nodesResp.Nodes), nodePool.NodePoolID)
