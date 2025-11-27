@@ -588,47 +588,48 @@ func (h *Handler) handleUpdateNodePools(
 ) (bool, error) {
 	var failed []string
 	changed := false
+
 	for _, np := range updateQueue {
 		unp, ok := upstream[np.NodePoolID]
 		if !ok {
 			continue
 		}
-
 		if tea.BoolValue(np.EnableAutoScaling) {
 			if !tea.BoolValue(unp.EnableAutoScaling) ||
 				(tea.Int64Value(np.MaxInstances) != tea.Int64Value(unp.MaxInstances)) ||
 				(tea.Int64Value(np.MinInstances) != tea.Int64Value(unp.MinInstances)) {
-				logrus.Infof("Updating nodepool [%s] in cluster [%s] AutoScaling config", np.Name, configSpec.ClusterName)
-				err := alibaba.UpdateNodePoolAutoScalingConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, true, np.MaxInstances, np.MinInstances)
+
+				logrus.Infof("Updating nodepool [%s] AutoScaling -> TRUE. Limits: Min [%d] Max [%d]",
+					np.Name, tea.Int64Value(np.MinInstances), tea.Int64Value(np.MaxInstances))
+
+				err := alibaba.UpdateNodePoolConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, true, np.MaxInstances, np.MinInstances, nil)
 				if err != nil {
-					failed = append(failed, fmt.Sprintf("nodepool %s autoscaling update error: %s", np.Name, err.Error()))
+					failed = append(failed, fmt.Sprintf("nodepool %s autoscaling enable error: %s", np.Name, err.Error()))
 					continue
 				}
 				changed = true
 			}
 		} else {
+			shouldUpdate := false
 			if tea.BoolValue(unp.EnableAutoScaling) {
-				logrus.Infof("Disabling AutoScaling for nodepool [%s] in cluster [%s]", np.Name, configSpec.ClusterName)
-				err := alibaba.UpdateNodePoolAutoScalingConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, false, nil, nil)
-				if err != nil {
-					failed = append(failed, fmt.Sprintf("nodepool %s autoscaling disable error: %s", np.Name, err.Error()))
-					continue
-				}
-				changed = true
+				shouldUpdate = true
+				logrus.Infof("Disabling AutoScaling for nodepool [%s] and setting Fixed Size: %d", np.Name, tea.Int64Value(np.DesiredSize))
+			} else if np.DesiredSize != nil && unp.DesiredSize != nil && tea.Int64Value(np.DesiredSize) != tea.Int64Value(unp.DesiredSize) {
+				shouldUpdate = true
+				logrus.Infof("Updating desired size for nodepool [%s] from %d to %d",
+					np.Name, tea.Int64Value(unp.DesiredSize), tea.Int64Value(np.DesiredSize))
 			}
-
-			if np.DesiredSize != nil && unp.DesiredSize != nil && tea.Int64Value(np.DesiredSize) != tea.Int64Value(unp.DesiredSize) {
-				logrus.Infof("Updating desired size for nodepool [%s] in cluster [%s] from %d to %d",
-					np.Name, configSpec.ClusterName, tea.Int64Value(unp.DesiredSize), tea.Int64Value(np.DesiredSize))
-				err := alibaba.UpdateNodePoolDesiredSize(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, np.DesiredSize)
+			if shouldUpdate {
+				err := alibaba.UpdateNodePoolConfig(ctx, h.alibabaClients.clustersClient, configSpec.ClusterID, np.NodePoolID, false, nil, nil, np.DesiredSize)
 				if err != nil {
-					failed = append(failed, fmt.Sprintf("nodepool %s desired size update error: %s", np.Name, err.Error()))
+					failed = append(failed, fmt.Sprintf("nodepool %s update error: %s", np.Name, err.Error()))
 					continue
 				}
 				changed = true
 			}
 		}
 	}
+
 	if len(failed) > 0 {
 		return changed, fmt.Errorf("%s", strings.Join(failed, ";"))
 	}
