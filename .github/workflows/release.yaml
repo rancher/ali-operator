@@ -16,7 +16,7 @@ jobs:
         arch: [amd64, arm64]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     - name: Read secrets
       uses: rancher-eio/read-vault-secrets@main
       with:
@@ -124,7 +124,7 @@ jobs:
     needs: merge
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
         ref: ${{ github.ref_name}}
