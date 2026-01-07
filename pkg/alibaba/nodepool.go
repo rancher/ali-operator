@@ -231,10 +231,10 @@ func WaitForNodePool(state *string) bool {
 		*state == NodePoolStatusUpdating || *state == NodePoolStatusRemoving || *state == NodePoolStatusRemovingNodes
 }
 
-func UpdateNodePoolAutoScalingConfig(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePoolID string, maxInstances *int64, minInstances *int64) error {
+func UpdateNodePoolAutoScalingConfig(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePoolID string, enable bool, maxInstances *int64, minInstances *int64) error {
 	req := &cs.ModifyClusterNodePoolRequest{
 		AutoScaling: &cs.ModifyClusterNodePoolRequestAutoScaling{
-			Enable:       tea.Bool(true),
+			Enable:       tea.Bool(enable), // Use the passed argument
 			MaxInstances: maxInstances,
 			MinInstances: minInstances,
 		},
@@ -253,6 +253,28 @@ func UpdateNodePoolDesiredSize(ctx context.Context, client services.ClustersClie
 			DesiredSize: desiredSize,
 		},
 	}
+	_, err := client.ModifyClusterNodePool(ctx, &clusterID, &nodePoolID, req)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func UpdateNodePoolConfig(ctx context.Context, client services.ClustersClientInterface, clusterID string, nodePoolID string, enableAutoScaling bool, maxInstances *int64, minInstances *int64, desiredSize *int64) error {
+
+	req := &cs.ModifyClusterNodePoolRequest{
+		AutoScaling: &cs.ModifyClusterNodePoolRequestAutoScaling{
+			Enable:       tea.Bool(enableAutoScaling),
+			MaxInstances: maxInstances,
+			MinInstances: minInstances,
+		},
+	}
+	if !enableAutoScaling && desiredSize != nil {
+		req.ScalingGroup = &cs.ModifyClusterNodePoolRequestScalingGroup{
+			DesiredSize: desiredSize,
+		}
+	}
+
 	_, err := client.ModifyClusterNodePool(ctx, &clusterID, &nodePoolID, req)
 	if err != nil {
 		return err

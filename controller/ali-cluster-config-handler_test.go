@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rancher/ali-operator/pkg/alibaba"
@@ -16,6 +15,7 @@ import (
 	"github.com/rancher/ali-operator/pkg/test"
 	cs "github.com/rancher/muchang/cs/client"
 	"github.com/rancher/muchang/utils/tea"
+	"go.uber.org/mock/gomock"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -843,17 +843,24 @@ var _ = Describe("handleUpdateNodePools", func() {
 		Expect(changed).To(BeTrue())
 	})
 
-	It("should skip update if autoscaling configuration mismatch", func() {
+	It("should update autoscaling config if autoscaling configuration mismatch", func() {
 		updateQueue := []aliv1.AliNodePool{
 			{NodePoolID: "np1", Name: "pool1", EnableAutoScaling: tea.Bool(true), MaxInstances: tea.Int64(6), MinInstances: tea.Int64(1)},
 		}
 		upstreamNodePoolConfigMap := map[string]aliv1.AliNodePool{
 			"np1": {NodePoolID: "np1", Name: "pool1", EnableAutoScaling: tea.Bool(false), MaxInstances: tea.Int64(5), MinInstances: tea.Int64(1)},
 		}
+		clustersClientMock.EXPECT().ModifyClusterNodePool(
+			gomock.Any(),
+			&config.Spec.ClusterID,
+			&updateQueue[0].NodePoolID,
+			gomock.Any(),
+		).Return(nil, nil)
 
 		changed, err := handler.handleUpdateNodePools(context.Background(), &config.Spec, updateQueue, upstreamNodePoolConfigMap)
+
 		Expect(err).NotTo(HaveOccurred())
-		Expect(changed).To(BeFalse())
+		Expect(changed).To(BeTrue())
 	})
 
 	It("should return error if UpdateNodePoolAutoScalingConfig fails", func() {
