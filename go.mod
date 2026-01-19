@@ -13,7 +13,7 @@ require (
 	github.com/rancher/lasso v0.2.5
 	github.com/rancher/muchang v0.1.0
 	github.com/rancher/wrangler/v3 v3.3.1
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	go.uber.org/mock v0.6.0
 	k8s.io/api v0.34.1
 	k8s.io/apiextensions-apiserver v0.34.1
