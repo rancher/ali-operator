@@ -25,6 +25,24 @@ updates:
     # Ignore wrangler and lasso since these will be upgraded according to corresponding rancher version manually
     - dependency-name: "github.com/rancher/wrangler/v3"
     - dependency-name: "github.com/rancher/lasso"
+# Go modules in release-v2.14 branch
+- package-ecosystem: "gomod"
+  directory: "/"
+  schedule:
+    interval: "weekly"
+  commit-message:
+    prefix: ":seedling:"
+  target-branch: "release-v2.14"
+  ignore:
+    # Ignore controller-runtime as it's upgraded manually.
+    - dependency-name: "sigs.k8s.io/controller-runtime"
+    # Ignore k8s and its transitives modules as they are upgraded manually
+    # together with controller-runtime.
+    - dependency-name: "k8s.io/*"
+    # Ignore wrangler and lasso since these will be upgraded according to corresponding rancher version manually
+    - dependency-name: "github.com/rancher/wrangler/v3"
+    - dependency-name: "github.com/rancher/lasso"
+# Go modules in release-v2.13 branch
 - package-ecosystem: "gomod"
   directory: "/"
   schedule:
