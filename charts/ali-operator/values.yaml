@@ -1,6 +1,7 @@
 global:
   cattle:
     systemDefaultRegistry: ""
+    imagePullSecrets: []
 
 aliOperator:
   image:
