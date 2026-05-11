@@ -22,6 +22,24 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry |  STAGE_REGISTRY_REGISTRY;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username |  STAGE_REGISTRY_USERNAME;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password |  STAGE_REGISTRY_PASSWORD;
+      - name: Publish images
+        uses: rancher/ecm-distro-tools/actions/publish-image@da9f5b6e258c327660eeab3db97952b612f1cf9f # v0.69.3
+        with:
+          image: ali-operator
+          tag: ${{ github.ref_name }}${{ matrix.tag-suffix }}
+          platforms: ${{ matrix.platforms }}
+          public-registry: docker.io
+          public-repo: rancher
+          public-username: ${{ env.PUBLIC_REGISTRY_USERNAME }}
+          public-password: ${{ env.PUBLIC_REGISTRY_PASSWORD }}
+          prime-registry: ${{ env.PRIME_REGISTRY }}
+          prime-repo: rancher
+          prime-username: ${{ env.PRIME_REGISTRY_USERNAME }}
+          prime-password: ${{ env.PRIME_REGISTRY_PASSWORD }}
+          make-target: image-push
+          push-to-prime: ${{ !contains(github.ref_name, '-rc') }}
+      - name: Cleanup checksum files # in order to avoid goreleaser dirty state error, remove once rancher/ecm-distro-tools/actions/publish-image@main gets updated
+        run: rm -f slsactl_*_checksums.txt*       
       - name: Setup Environment Variables
         run: |
           echo "IMAGE=${{ env.STAGE_REGISTRY_REGISTRY }}/rancher/ali-operator" >> $GITHUB_ENV
@@ -158,14 +176,14 @@ jobs:
           	install -m 755 goreleaser /usr/local/bin/goreleaser
           fi
           rm -f "${FILE}" goreleaser
-      - name: Create release
+      - name: Create release (DRAFT)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required for creating GH release
           GORELEASER_CURRENT_TAG: ${{ github.ref_name }} # specify the tag to be released
         id: goreleaser
         shell: bash
         run: |-
-          goreleaser release --clean --verbose
+          goreleaser release --clean --verbose --draft
           if [[ ! -f dist/metadata.json ]] || [[ ! -s dist/metadata.json ]]; then
             echo "Missing required file: dist/metadata.json"
             exit 1
@@ -230,3 +248,9 @@ jobs:
           git commit -m "Update charts to version $version"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git push origin "$charts_branch"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.ref_name }}" --draft=false
+          
