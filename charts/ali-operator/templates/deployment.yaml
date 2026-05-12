@@ -25,6 +25,7 @@ spec:
       {{- if .Values.priorityClassName }}
       priorityClassName: "{{.Values.priorityClassName}}"
       {{- end }}
+      {{- include "rancher-ali-operator.imagePullSecrets" . | nindent 6 }}
       securityContext:
         fsGroup: 1007
         runAsUser: 1007
