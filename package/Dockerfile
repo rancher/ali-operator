@@ -6,7 +6,7 @@ FROM registry.suse.com/bci/bci-base:${BCI_VERSION} AS base
 RUN sed -i 's/^CREATE_MAIL_SPOOL=yes/CREATE_MAIL_SPOOL=no/' /etc/default/useradd
 RUN useradd --uid 1007 ali-operator
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.25 AS builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26 AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
