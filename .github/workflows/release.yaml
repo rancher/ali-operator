@@ -22,24 +22,6 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry |  STAGE_REGISTRY_REGISTRY;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username |  STAGE_REGISTRY_USERNAME;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password |  STAGE_REGISTRY_PASSWORD;
-      - name: Publish images
-        uses: rancher/ecm-distro-tools/actions/publish-image@da9f5b6e258c327660eeab3db97952b612f1cf9f # v0.69.3
-        with:
-          image: ali-operator
-          tag: ${{ github.ref_name }}${{ matrix.tag-suffix }}
-          platforms: ${{ matrix.platforms }}
-          public-registry: docker.io
-          public-repo: rancher
-          public-username: ${{ env.PUBLIC_REGISTRY_USERNAME }}
-          public-password: ${{ env.PUBLIC_REGISTRY_PASSWORD }}
-          prime-registry: ${{ env.PRIME_REGISTRY }}
-          prime-repo: rancher
-          prime-username: ${{ env.PRIME_REGISTRY_USERNAME }}
-          prime-password: ${{ env.PRIME_REGISTRY_PASSWORD }}
-          make-target: image-push
-          push-to-prime: ${{ !contains(github.ref_name, '-rc') }}
-      - name: Cleanup checksum files # in order to avoid goreleaser dirty state error, remove once rancher/ecm-distro-tools/actions/publish-image@main gets updated
-        run: rm -f slsactl_*_checksums.txt*      
       - name: Setup Environment Variables
         run: |
           echo "IMAGE=${{ env.STAGE_REGISTRY_REGISTRY }}/rancher/ali-operator" >> $GITHUB_ENV
