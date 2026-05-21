@@ -1,0 +1,24 @@
+global:
+  cattle:
+    systemDefaultRegistry: ""
+    imagePullSecrets: []
+
+aliOperator:
+  image:
+    repository: rancher/ali-operator
+    tag: v1.15.0-rc.1
+
+httpProxy: ""
+httpsProxy: ""
+noProxy: ""
+additionalTrustedCAs: false
+
+## Node labels for pod assignment
+## Ref: https://kubernetes.io/docs/user-guide/node-selection/
+##
+nodeSelector: {}
+## List of node taints to tolerate
+tolerations: []
+
+## PriorityClassName assigned to deployment.
+priorityClassName: ""
