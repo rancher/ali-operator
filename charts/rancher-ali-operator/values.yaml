@@ -6,7 +6,7 @@ global:
 aliOperator:
   image:
     repository: rancher/ali-operator
-    tag: v1.15.0-rc.2
+    tag: v1.15.0-rc.3
 
 httpProxy: ""
 httpsProxy: ""
