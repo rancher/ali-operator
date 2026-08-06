@@ -1,9 +1,8 @@
 # Image that provides cross compilation tooling.
-ARG BCI_VERSION=15.7
+ARG BCI_VERSION=16.1
 FROM --platform=$BUILDPLATFORM rancher/mirrored-tonistiigi-xx:1.6.1 AS xx
 
 FROM registry.suse.com/bci/bci-base:${BCI_VERSION} AS base
-RUN sed -i 's/^CREATE_MAIL_SPOOL=yes/CREATE_MAIL_SPOOL=no/' /etc/default/useradd
 RUN useradd --uid 1007 ali-operator
 
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26 AS builder
