@@ -17,14 +17,14 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.2.9
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/wrangler/v3 v3.7.0
+	github.com/rancher/wrangler/v3 v3.0.0-00010101000000-000000000000
 	github.com/sirupsen/logrus v1.10.0
 	go.uber.org/mock v0.6.0
 	k8s.io/api v0.37.0
 	k8s.io/apiextensions-apiserver v0.37.0
 	k8s.io/apimachinery v0.37.0
 	k8s.io/client-go v0.37.0
-	sigs.k8s.io/controller-runtime v0.24.0
+	sigs.k8s.io/controller-runtime v0.24.1
 )
 
 require (
