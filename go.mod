@@ -7,8 +7,8 @@ toolchain go1.26.5
 replace google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
-	github.com/onsi/ginkgo/v2 v2.32.0
-	github.com/onsi/gomega v1.42.1
+	github.com/onsi/ginkgo/v2 v2.32.1
+	github.com/onsi/gomega v1.43.0
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.2.9
 	github.com/rancher/muchang v0.1.1
