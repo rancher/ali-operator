@@ -41,7 +41,7 @@ const (
 	ManagedClusterType = "ManagedKubernetes"
 )
 
-// SyncConfigSpecClusterFieldsWithUpstream fix fields for imported clusters
+// SyncConfigSpecClusterFieldsWithUpstream fixes fields for imported clusters
 func SyncConfigSpecClusterFieldsWithUpstream(configSpec *aliv1.AliClusterConfigSpec, cluster *cs.DescribeClusterDetailResponseBody) {
 	// update known field from query result
 
