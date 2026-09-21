@@ -167,6 +167,7 @@ type AliAddon struct {
 type AliClusterConfigStatus struct {
 	Phase          string `json:"phase"`
 	FailureMessage string `json:"failureMessage"`
+	Message        string `json:"message"`
 	// UpgradeTaskID is the id of the latest upgrade task performed on the cluster.
 	// it is set to empty
 	UpgradeTaskID string `json:"upgradeTaskId"`
