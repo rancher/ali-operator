@@ -172,7 +172,8 @@ func (h *Handler) importCluster(config *aliv1.AliClusterConfig) (*aliv1.AliClust
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logrus.Infof("Importing config for cluster [%s (id: %s)]", config.Spec.ClusterName, config.Name)
+	message := fmt.Sprintf("Importing cluster [%s (id: %s)]", config.Spec.ClusterName, config.Name)
+	logrus.Infof("%s", message)
 
 	clusterResp, err := h.alibabaClients.clustersClient.DescribeClusterDetail(ctx, &config.Spec.ClusterID)
 	if err != nil {
@@ -194,6 +195,7 @@ func (h *Handler) importCluster(config *aliv1.AliClusterConfig) (*aliv1.AliClust
 
 	config = config.DeepCopy()
 	config.Status.Phase = aliConfigActivePhase
+	config.Status.Message = ""
 	return h.aliCC.UpdateStatus(config)
 }
 
@@ -202,8 +204,12 @@ func (h *Handler) create(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfi
 	defer cancel()
 
 	if config.Spec.Imported {
+		message := fmt.Sprintf("Importing cluster [%s (id: %s)]", config.Spec.ClusterName, config.Name)
+		logrus.Infof("%s", message)
+
 		config = config.DeepCopy()
 		config.Status.Phase = aliConfigImportingPhase
+		config.Status.Message = message
 		return h.aliCC.UpdateStatus(config)
 	}
 
@@ -219,8 +225,14 @@ func (h *Handler) create(config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfi
 	if err != nil {
 		return config, err
 	}
+
 	config = configUpdate.DeepCopy()
 	config.Status.Phase = aliConfigCreatingPhase
+	config.Status.Message = fmt.Sprintf(
+		"Waiting for cluster [%s (id: %s)] to finish creating",
+		config.Spec.ClusterName,
+		config.Name,
+	)
 	config, err = h.aliCC.UpdateStatus(config)
 	logrus.Infof("Cluster id:%s for cluster:%s", config.Spec.ClusterID, config.Spec.ClusterName)
 	return config, err
@@ -247,10 +259,26 @@ func (h *Handler) waitForCreationComplete(config *aliv1.AliClusterConfig) (*aliv
 		logrus.Infof("Cluster %v is running", config.Spec.ClusterName)
 		config = config.DeepCopy()
 		config.Status.Phase = aliConfigActivePhase
+		config.Status.Message = ""
 		return h.aliCC.UpdateStatus(config)
 	}
 
-	logrus.Infof("Waiting for cluster [%s] to finish creating", config.Name)
+	message := fmt.Sprintf(
+		"Waiting for cluster [%s (id: %s)] to finish creating",
+		config.Spec.ClusterName,
+		config.Name,
+	)
+	logrus.Infof("%s", message)
+
+	if config.Status.Message != message {
+		config = config.DeepCopy()
+		config.Status.Message = message
+		config, err = h.aliCC.UpdateStatus(config)
+		if err != nil {
+			return config, err
+		}
+	}
+
 	h.aliEnqueueAfter(config.Namespace, config.Name, enqueuePeriod)
 	return config, nil
 }
@@ -279,8 +307,13 @@ func (h *Handler) checkAndUpdate(config *aliv1.AliClusterConfig) (*aliv1.AliClus
 			if taskInfo.State != nil {
 				switch *taskInfo.State {
 				case alibaba.UpdateK8sRunningStatus:
-					logrus.Infof("Cluster %s in region %s is being upgraded", config.Spec.ClusterName, config.Spec.RegionID)
-					return h.enqueueUpdate(config, enqueuePeriod)
+					message := fmt.Sprintf(
+						"Updating Kubernetes version for cluster [%s (id: %s)]",
+						config.Spec.ClusterName,
+						config.Name,
+					)
+					logrus.Infof("%s", message)
+					return h.enqueueUpdate(config, enqueuePeriod, message)
 				case alibaba.UpdateK8sFailStatus:
 					if taskInfo.Error == nil || taskInfo.Error.Message == nil {
 						return config, fmt.Errorf("update cluster %s failed: error message is missing", config.Spec.ClusterID)
@@ -308,8 +341,15 @@ func (h *Handler) checkAndUpdate(config *aliv1.AliClusterConfig) (*aliv1.AliClus
 	}
 
 	if clusterState != alibaba.ClusterStatusRunning {
-		logrus.Infof("Cluster is in %s state, waiting for the cluster to come in %s state", clusterState, alibaba.ClusterStatusRunning)
-		return h.enqueueUpdate(config, enqueuePeriod)
+		message := fmt.Sprintf(
+			"Waiting for cluster [%s (id: %s)] to reach %s state (current state: %s)",
+			config.Spec.ClusterName,
+			config.Name,
+			alibaba.ClusterStatusRunning,
+			clusterState,
+		)
+		logrus.Infof("%s", message)
+		return h.enqueueUpdate(config, enqueuePeriod, message)
 	}
 
 	nodePools, err := alibaba.GetNodePools(ctx, h.alibabaClients.clustersClient, &config.Spec)
@@ -326,15 +366,28 @@ func (h *Handler) checkAndUpdate(config *aliv1.AliClusterConfig) (*aliv1.AliClus
 			continue
 		}
 		if alibaba.WaitForNodePool(np.Status.State) {
-			logrus.Infof("Waiting for cluster [%s] to sync nodepool [%s] state [%s]", config.Spec.ClusterName, *np.NodepoolInfo.Name, *np.Status.State)
-			return h.enqueueUpdate(config, enqueuePeriod)
+			message := fmt.Sprintf(
+				"Waiting for cluster [%s] to sync nodepool [%s] state [%s]",
+				config.Spec.ClusterName,
+				*np.NodepoolInfo.Name,
+				*np.Status.State,
+			)
+			logrus.Infof("%s", message)
+			return h.enqueueUpdate(config, enqueuePeriod, message)
 		}
 	}
 
 	if config.Spec.KubernetesVersion != tea.StringValue(cluster.CurrentVersion) {
+		message := fmt.Sprintf(
+			"Updating Kubernetes version for cluster [%s (id: %s)]",
+			config.Spec.ClusterName,
+			config.Name,
+		)
+
 		if config.Status.Phase != aliConfigUpdatingPhase {
-			return h.enqueueUpdate(config, enqueuePeriod)
+			return h.enqueueUpdate(config, enqueuePeriod, message)
 		}
+
 		taskID, err := alibaba.UpgradeCluster(ctx, h.alibabaClients.clustersClient, &config.Spec)
 		if err != nil {
 			updateErr := fmt.Errorf(`{"%s":"%s"}`, alibaba.UpdateK8SVersionApiError, err.Error())
@@ -342,6 +395,7 @@ func (h *Handler) checkAndUpdate(config *aliv1.AliClusterConfig) (*aliv1.AliClus
 		}
 		config = config.DeepCopy()
 		config.Status.UpgradeTaskID = taskID
+		config.Status.Message = message
 		return h.updateStatus(config)
 	}
 
@@ -408,14 +462,23 @@ func (h *Handler) createCASecret(ctx context.Context, config *aliv1.AliClusterCo
 
 // enqueueUpdate enqueues the config if it is already in the updating phase. Otherwise, the
 // phase is updated to "updating".
-func (h *Handler) enqueueUpdate(config *aliv1.AliClusterConfig, period time.Duration) (*aliv1.AliClusterConfig, error) {
+func (h *Handler) enqueueUpdate(config *aliv1.AliClusterConfig, period time.Duration, message string) (*aliv1.AliClusterConfig, error) {
 	if config.Status.Phase == aliConfigUpdatingPhase {
+		if config.Status.Message != message {
+			config = config.DeepCopy()
+			config.Status.Message = message
+			config, err := h.aliCC.UpdateStatus(config)
+			if err != nil {
+				return config, err
+			}
+		}
 		h.aliEnqueueAfter(config.Namespace, config.Name, period)
 		return config, nil
 	}
 
 	config = config.DeepCopy()
 	config.Status.Phase = aliConfigUpdatingPhase
+	config.Status.Message = message
 	return h.aliCC.UpdateStatus(config)
 }
 
@@ -452,7 +515,7 @@ func (h *Handler) updateUpstreamClusterState(config *aliv1.AliClusterConfig) (*a
 			return config, err
 		}
 		if changed {
-			return h.enqueueUpdate(config, enqueuePeriod)
+			return h.enqueueUpdate(config, enqueuePeriod, "Updating node pools")
 		}
 	}
 
@@ -461,6 +524,7 @@ func (h *Handler) updateUpstreamClusterState(config *aliv1.AliClusterConfig) (*a
 		logrus.Infof("cluster [%s] finished updating", config.Name)
 		config = config.DeepCopy()
 		config.Status.Phase = aliConfigActivePhase
+		config.Status.Message = ""
 		return h.aliCC.UpdateStatus(config)
 	}
 
