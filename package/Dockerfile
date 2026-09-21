@@ -5,7 +5,7 @@ FROM --platform=$BUILDPLATFORM rancher/mirrored-tonistiigi-xx:1.5.0 AS xx
 FROM registry.suse.com/bci/bci-base:${BCI_VERSION} AS base
 RUN useradd --uid 1007 ali-operator
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.25 AS builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26.8 AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
