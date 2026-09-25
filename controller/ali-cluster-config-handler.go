@@ -131,6 +131,18 @@ func (h *Handler) recordError(onChange func(key string, config *aliv1.AliCluster
 	}
 }
 
+// updateConfigStatus updates the phase and message together when either has changed.
+func (h *Handler) updateConfigStatus(config *aliv1.AliClusterConfig, phase, message string) (*aliv1.AliClusterConfig, error) {
+	if config.Status.Phase == phase && config.Status.Message == message {
+		return config, nil
+	}
+
+	config = config.DeepCopy()
+	config.Status.Phase = phase
+	config.Status.Message = message
+	return h.aliCC.UpdateStatus(config)
+}
+
 func (h *Handler) OnAliConfigRemoved(_ string, config *aliv1.AliClusterConfig) (*aliv1.AliClusterConfig, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -270,13 +282,9 @@ func (h *Handler) waitForCreationComplete(config *aliv1.AliClusterConfig) (*aliv
 	)
 	logrus.Infof("%s", statusMessage)
 
-	if config.Status.Message != statusMessage {
-		config = config.DeepCopy()
-		config.Status.Message = statusMessage
-		config, err = h.aliCC.UpdateStatus(config)
-		if err != nil {
-			return config, err
-		}
+	config, err = h.updateConfigStatus(config, aliConfigCreatingPhase, statusMessage)
+	if err != nil {
+		return config, err
 	}
 
 	h.aliEnqueueAfter(config.Namespace, config.Name, enqueuePeriod)
@@ -522,10 +530,7 @@ func (h *Handler) updateUpstreamClusterState(config *aliv1.AliClusterConfig) (*a
 	// no new updates, set to active
 	if config.Status.Phase != aliConfigActivePhase {
 		logrus.Infof("cluster [%s] finished updating", config.Name)
-		config = config.DeepCopy()
-		config.Status.Phase = aliConfigActivePhase
-		config.Status.Message = ""
-		return h.aliCC.UpdateStatus(config)
+		return h.updateConfigStatus(config, aliConfigActivePhase, "")
 	}
 
 	return config, nil
