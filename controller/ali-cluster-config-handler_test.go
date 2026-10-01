@@ -442,6 +442,9 @@ var _ = Describe("create", func() {
 		updatedConfig, err := handler.create(createdConfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(updatedConfig.Status.Phase).To(Equal(aliConfigImportingPhase))
+		Expect(updatedConfig.Status.Message).To(
+			Equal("Importing cluster [test-create-cluster-name (id: test-create-cluster)]"),
+		)
 
 		fetchedConfig, err := aliFactory.Ali().V1().AliClusterConfig().Get(config.Namespace, config.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
@@ -462,6 +465,9 @@ var _ = Describe("create", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(updatedConfig.Spec.ClusterID).To(Equal("new-cluster-id"))
 		Expect(updatedConfig.Status.Phase).To(Equal(aliConfigCreatingPhase))
+		Expect(updatedConfig.Status.Message).To(
+			Equal("Waiting for cluster [test-create-cluster-name (id: test-create-cluster)] to finish creating"),
+		)
 
 		fetchedConfig, err := aliFactory.Ali().V1().AliClusterConfig().Get(config.Namespace, config.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
@@ -523,7 +529,8 @@ var _ = Describe("waitForCreationComplete", func() {
 				UID:       "test-uid-wait",
 			},
 			Spec: aliv1.AliClusterConfigSpec{
-				ClusterID: "c12345",
+				ClusterID:   "c12345",
+				ClusterName: "test-cluster",
 			},
 			Status: aliv1.AliClusterConfigStatus{
 				Phase: aliConfigCreatingPhase,
@@ -539,12 +546,22 @@ var _ = Describe("waitForCreationComplete", func() {
 
 	It("should enqueue if cluster is still creating", func() {
 		clusterDetailResp := &cs.DescribeClusterDetailResponse{
-			Body: &cs.DescribeClusterDetailResponseBody{State: tea.String("creating")},
+			Body: &cs.DescribeClusterDetailResponseBody{
+				State: tea.String("creating"),
+			},
 		}
-		clustersClientMock.EXPECT().DescribeClusterDetail(gomock.Any(), &config.Spec.ClusterID).Return(clusterDetailResp, nil)
+		clustersClientMock.EXPECT().
+			DescribeClusterDetail(gomock.Any(), &config.Spec.ClusterID).
+			Return(clusterDetailResp, nil)
 
-		_, err := handler.waitForCreationComplete(config)
+		createdConfig, err := aliFactory.Ali().V1().AliClusterConfig().Create(config)
 		Expect(err).NotTo(HaveOccurred())
+
+		updatedConfig, err := handler.waitForCreationComplete(createdConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updatedConfig.Status.Message).To(
+			Equal("Waiting for cluster [test-cluster (id: test-wait-cluster)] to finish creating"),
+		)
 
 		Eventually(enqueueChan).Should(Receive())
 	})
@@ -577,6 +594,7 @@ users: []`),
 		updatedConfig, err := handler.waitForCreationComplete(createdConfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(updatedConfig.Status.Phase).To(Equal(aliConfigActivePhase))
+		Expect(updatedConfig.Status.Message).To(BeEmpty())
 
 		secret, err := coreFactory.Core().V1().Secret().Get(config.Namespace, config.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
