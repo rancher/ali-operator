@@ -8,7 +8,7 @@ replace google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 => google.
 
 require (
 	github.com/onsi/ginkgo/v2 v2.33.0
-	github.com/onsi/gomega v1.43.1
+	github.com/onsi/gomega v1.44.0
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.2.10
 	github.com/rancher/muchang v0.1.1
