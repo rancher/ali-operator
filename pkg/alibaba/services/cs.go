@@ -11,7 +11,7 @@ import (
 	util "github.com/rancher/muchang/utils/tea-utils/service"
 )
 
-var errEmptyRegion = errors.New("regionId can not be empty")
+var errEmptyRegion = errors.New("regionId cannot be empty")
 
 type ClustersClientInterface interface {
 	DescribeClusterUserKubeconfig(ctx context.Context, clusterID *string, request *cs.DescribeClusterUserKubeconfigRequest) (result *cs.DescribeClusterUserKubeconfigResponse, err error)
