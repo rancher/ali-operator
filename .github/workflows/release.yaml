@@ -236,3 +236,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release edit "${{ github.ref_name }}" --draft=false
+
+  # Charts v2. The chart steps above are the old path, dropped once it is retired.
