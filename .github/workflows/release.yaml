@@ -236,3 +236,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release edit "${{ github.ref_name }}" --draft=false
+
+  # Charts v2. The chart steps above are the old path, dropped once it is retired.
+  stage-chart:
+    permissions:
+      contents: read
+      id-token: write # required by the called workflow to log in to Vault
+    needs: merge # the multi-arch manifest is pushed by merge, so the image must exist first
+    uses: ./.github/workflows/stage-chart.yaml
