@@ -12,12 +12,12 @@ annotations:
   catalog.cattle.io/scope: management
   helm.sh/images: |
     - name: ali-operator
-      image: rancher/ali-operator:v1.14.7-rc.1
+      image: rancher/ali-operator:v1.14.7
 apiVersion: v2
-appVersion: 1.14.7-rc.1
+appVersion: 1.14.7
 description: A Helm chart for provisioning ACK clusters
 home: https://github.com/rancher/ali-operator
 name: rancher-ali-operator
 sources:
 - https://github.com/rancher/ali-operator
-version: 1.14.7-rc.1
+version: 1.14.7
