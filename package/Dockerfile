@@ -1,48 +1,52 @@
-# Image that provides cross compilation tooling.
 ARG BCI_VERSION=16.1
-FROM --platform=$BUILDPLATFORM rancher/mirrored-tonistiigi-xx:1.5.0 AS xx
 
-FROM registry.suse.com/bci/bci-base:${BCI_VERSION} AS base
-RUN useradd --uid 1007 ali-operator
+# Minimal BCI base image, as recommended by RFD 0070.
+FROM registry.suse.com/bci/bci-nano:${BCI_VERSION} AS base
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26 AS builder
+# bci-nano has no shell to create the ali-operator user or the directories it
+# needs, so the files are prepared here and copied into the final image.
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:${BCI_VERSION} AS user-setup
+COPY --from=base /etc/passwd /final/etc/passwd
+COPY --from=base /etc/group /final/etc/group
+RUN echo "ali-operator:x:1007:1007::/home/ali-operator:/usr/bin/false" >> /final/etc/passwd && \
+    echo "ali-operator:x:1007:" >> /final/etc/group && \
+    install -dv -m 0755 -o 1007 -g 1007 /final/etc/rancher/ssl
+
+# Builds with the Go compiler from the AppCo Go image, as recommended by
+# RFD 0070. Pinned to MAJOR.MINOR.PATCH so the toolchain is deterministic and
+# bumped by Renovate. It has no package manager, and does not need one: Go
+# cross compiles with GOOS/GOARCH, as rancher/rancher does.
+FROM --platform=$BUILDPLATFORM registry.suse.com/rancher/appco-go:1.26.11 AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download && go mod verify
 
 COPY ./controller ./controller
 COPY ./pkg ./pkg
 COPY ./main.go ./main.go
 
-# Copy xx scripts to your build stage
-COPY --from=xx / /
-
-ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 ARG COMMIT
 ARG VERSION
 ENV CGO_ENABLED=0
-RUN xx-go build -ldflags \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags \
            "-X github.com/rancher/ali-operator/pkg/version.GitCommit=${COMMIT} \
             -X github.com/rancher/ali-operator/pkg/version.Version=${VERSION}" \
-       -o /ali-operator && \
-       xx-verify /ali-operator
+       -o /out/ali-operator
 
-FROM registry.suse.com/bci/bci-micro:${BCI_VERSION}
-COPY --from=base /etc/passwd /etc/passwd
-COPY --from=base /etc/shadow /etc/shadow
-COPY --from=builder /ali-operator /usr/bin/ali-operator
+FROM base AS final
 
-RUN rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/*
+COPY --from=user-setup /final/ /
+COPY --from=builder /out/ali-operator /usr/bin/ali-operator
 
 ENV KUBECONFIG="/home/ali-operator/.kube/config"
+# ali-operator is a static Go binary, which loads every certificate file in
+# SSL_CERT_DIR, so no c_rehash step is needed for additional CAs.
 ENV SSL_CERT_DIR="/etc/rancher/ssl"
 
-COPY package/entrypoint.sh /usr/bin
-RUN chmod +x /usr/bin/entrypoint.sh
-
-RUN mkdir -p /etc/rancher/ssl && \
-    chown -R ali-operator /etc/rancher/ssl
-
 USER 1007
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/ali-operator"]
